@@ -1,0 +1,21 @@
+[package]
+name = "catt"
+version = "0.1.0"
+authors = ["Josh Chase <jcjoshuachase@gmail.com>"]
+
+[dependencies]
+openzwave-stateful = { git = "https://github.com/fxbox/openzwave-stateful-rust" }
+mqtt3 = "*"
+mustache = "*"
+lazy_static = "*"
+log = "*"
+shellexpand = "*"
+toml = "*"
+rustc-serialize = "*"
+error-chain = "*"
+env_logger = "*"
+rustls = "*"
+mioco = "*"
+
+[[bin]]
+name = "zwave"

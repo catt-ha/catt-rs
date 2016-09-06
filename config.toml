@@ -1,0 +1,16 @@
+[mqtt]
+broker = "10.8.0.1:1883"
+client-id = "catt-zwave"
+
+[zwave]
+port = "/dev/ttyUSB0"
+
+[[zwave.device]]
+id = 13
+name = "controller"
+command = "controller"
+
+[[zwave.device]]
+id = 8
+name = "Light_Living_Table"
+command = "switch_binary"
