@@ -1,77 +1,78 @@
-use std::collections::HashMap;
-use std::rc::Rc;
-use std::cell::RefCell;
+use std::fmt;
+use std::fmt::Display;
+use openzwave_stateful::ValueID;
+use openzwave_stateful::Node;
 
-use config::DeviceConfig;
+use std::collections::BTreeSet;
 
-#[derive(Default,Debug)]
-pub struct DeviceDB {
-    by_name: HashMap<String, Rc<RefCell<Device>>>,
-    by_id: HashMap<DeviceDesc, Rc<RefCell<Device>>>,
-}
-
-#[derive(Default,Debug)]
+#[derive(Eq, PartialEq, Debug)]
 pub struct Device {
-    name: String,
-    desc: DeviceDesc,
-    state: DeviceState,
+    pub node: Node,
+    pub values: BTreeSet<ValueID>,
 }
 
-#[derive(Default,Debug,Clone,PartialEq,Eq,Hash)]
-pub struct DeviceDesc {
-    id: u64,
-    endpoint: Option<u64>,
-    command: String,
+impl PartialOrd for Device {
+    fn partial_cmp(&self, other: &Self) -> Option<::std::cmp::Ordering> {
+        self.node.get_id().partial_cmp(&other.node.get_id())
+    }
+}
+
+impl Ord for Device {
+    fn cmp(&self, other: &Self) -> ::std::cmp::Ordering {
+        self.node.get_id().cmp(&other.node.get_id())
+    }
+}
+
+impl Display for Device {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        PrettyNode(&self.node).fmt(f)?;
+        PrettyValues(&self.values).fmt(f)?;
+        Ok(())
+    }
 }
 
 #[derive(Debug)]
-pub enum DeviceState {
-    Basic(i64),
-    BinarySwitch(bool),
-    BinarySensor(bool),
-    Multilevel(i64),
-}
+struct PrettyNode<'a>(&'a Node);
+#[derive(Debug)]
+struct PrettyValues<'a>(&'a BTreeSet<ValueID>);
 
-impl Default for DeviceState {
-    fn default() -> Self {
-        return DeviceState::Basic(0);
+
+impl<'a> Display for PrettyNode<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        writeln!(f, "Node {}:", self.0.get_id())?;
+        writeln!(f, "\tProduct: {}", self.0.get_product_name())?;
+        writeln!(f, "\tManufacturer: {}", self.0.get_manufacturer_name())?;
+        writeln!(f, "\tType: {}", self.0.get_type())?;
+        Ok(())
     }
 }
 
-impl<'a> From<&'a str> for DeviceState {
-    fn from(other: &'a str) -> Self {
-        match other {
-            "basic" => DeviceState::Basic(0),
-            "switch_binary" => DeviceState::BinarySwitch(false),
-            "sensor_binary" => DeviceState::BinarySensor(false),
-            "switch_multilevel" => DeviceState::Multilevel(0),
-            _ => DeviceState::Basic(0),
-        }
-    }
-}
-
-
-impl DeviceDB {
-    pub fn from_config(configs: Vec<DeviceConfig>) -> Self {
-        let mut db: DeviceDB = Default::default();
-        configs.iter()
-            .map(|ref cfg| {
-                let mut dev = Device::default();
-                dev.name = cfg.name.clone();
-                {
-                    let desc = &mut dev.desc;
-                    desc.id = cfg.id;
-                    desc.endpoint = cfg.endpoint;
-                    desc.command = cfg.command
-                        .as_ref()
-                        .map_or("basic".into(), |cmd| cmd.clone());
+impl<'a> Display for PrettyValues<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let mut cc = None;
+        for v in self.0.iter() {
+            let new_cc = if let Some(c) = cc {
+                if v.get_command_class_id() != c as u8 {
+                    true
+                } else {
+                    false
                 }
-                cfg.command.as_ref().map(|ref cmd| dev.state = DeviceState::from(cmd.as_ref()));
-                let shared = Rc::new(RefCell::new(dev));
-                db.by_id.insert(shared.borrow().desc.clone(), shared.clone());
-                db.by_name.insert(shared.borrow().name.clone(), shared.clone());
-            })
-            .collect::<Vec<()>>();
-        db
+            } else {
+                true
+            };
+
+            if new_cc {
+                cc = Some(v.get_command_class().unwrap());
+                writeln!(f, "\tCommandClass {}", v.get_command_class().unwrap())?;
+            }
+
+            writeln!(f, "\t\tValue {}:", v.get_index())?;
+            writeln!(f, "\t\t\tLabel: {}", v.get_label())?;
+            writeln!(f, "\t\t\tHelp {}", v.get_help())?;
+            writeln!(f, "\t\t\tGenre: {:?}", v.get_genre())?;
+            writeln!(f, "\t\t\tType: {:?}", v.get_type())?;
+            writeln!(f, "\t\t\tState: {}", v.as_string().unwrap_or("???".into()))?;
+        }
+        Ok(())
     }
 }

@@ -1,3 +1,4 @@
+use mqttc;
 use mqtt3;
 
 error_chain!{
@@ -8,15 +9,25 @@ error_chain!{
     }
 
     errors {
-        MqttError(e: mqtt3::Error) {
-            description("Mqtt protocol error")
-            display("mqtt error: {:?}", e)
+        Mqttc(e: mqttc::Error) {
+            description("Mqtt client error")
+            display("Mqtt client error: {:?}", e)
         }
+        Mqtt3(e: mqtt3::Error) {
+            description("Mqtt proto error")
+                display("Mqtt proto error: {:?}", e)
+        }
+    }
+}
+
+impl From<mqttc::Error> for Error {
+    fn from(other: mqttc::Error) -> Self {
+        ErrorKind::Mqttc(other).into()
     }
 }
 
 impl From<mqtt3::Error> for Error {
     fn from(other: mqtt3::Error) -> Self {
-        ErrorKind::MqttError(other).into()
+        ErrorKind::Mqtt3(other).into()
     }
 }

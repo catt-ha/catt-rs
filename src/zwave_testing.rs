@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 #![allow(unused_imports)]
 
-use cvar::CVar;
+use util::CVar;
 
 use openzwave_stateful::{ConfigPath, InitOptions, ValueGenre, ValueID, ValueType,
                          ZWaveNotification, init};
@@ -12,6 +12,7 @@ use std::sync::Arc;
 use std::sync::Condvar;
 use std::sync::Mutex;
 use std::sync::mpsc::Receiver;
+use std::collections::BTreeSet;
 use std::thread;
 
 use std::time;
@@ -50,7 +51,12 @@ pub fn run() {
     // wait for the thread to start up
     driver.wait_ready();
 
-    let light_set = driver.find_value(None, Some(CommandClass::SwitchBinary as u8), None, None);
+    let light_set = driver.state()
+        .get_values()
+        .iter()
+        .cloned()
+        .filter(|v| v.get_command_class_id() == CommandClass::SwitchBinary as u8)
+        .collect::<BTreeSet<ValueID>>();
     light_set.iter()
         .map(|v| {
             v.set_bool(false).unwrap();

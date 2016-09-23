@@ -1,20 +1,27 @@
-use cvar::CVar;
+use util::CVar;
 
-use openzwave_stateful::{self, ConfigPath, InitOptions, ValueID, ZWaveManager, ZWaveNotification};
+use openzwave_stateful::{self, ConfigPath, InitOptions, ZWaveManager, ZWaveNotification, ValueType};
 
-use mioco::sync::mpsc::{self, Receiver, Sender};
+pub use openzwave_stateful::ValueID;
+pub use openzwave_stateful::State;
 
+use std::sync::mpsc::{self, Receiver, Sender};
+
+use std::sync::MutexGuard;
 use std::iter::Iterator;
 use std::sync::Arc;
 
+use std::collections::BTreeSet;
+
 use super::errors::*;
 
-use recv_wrap;
+use super::device::Device;
 
 pub struct Driver {
     manager: Arc<ZWaveManager>,
     ready: CVar,
     updates: Receiver<ValueID>,
+    devices: Option<BTreeSet<Device>>,
 }
 
 impl Driver {
@@ -34,9 +41,10 @@ impl Driver {
             manager: manager,
             ready: ready.clone(),
             updates: rx,
+            devices: None,
         };
 
-        spawn_notification_thread(tx, recv_wrap::Receiver::new(notifications), ready);
+        spawn_notification_thread(tx, notifications, ready);
 
         Ok(driver)
     }
@@ -50,32 +58,47 @@ impl Driver {
         &self.updates
     }
 
-    pub fn find_value(&self,
-                      node_id: Option<u8>,
-                      command_class: Option<u8>,
-                      instance: Option<u8>,
-                      index: Option<u8>)
-                      -> Vec<ValueID> {
+    pub fn get_devices(&mut self) -> &BTreeSet<Device> {
+        match self.devices {
+            Some(ref d) => d,
+            None => {
+                self.init_devices();
+                self.get_devices()
+            }
+        }
+    }
+
+    fn init_devices(&mut self) {
         let state = self.manager.get_state();
 
-        let cloned_values = state.get_values()
-            .iter()
-            .cloned();
+        let nodes = state.get_nodes();
+        let values = state.get_values();
+        let mut devices = BTreeSet::new();
 
-        let filtered_values =
-            cloned_values.filter(|v| node_id.map_or(true, |i| v.get_node_id() == i))
-                .filter(|v| command_class.map_or(true, |c| v.get_command_class_id() == c))
-                .filter(|v| instance.map_or(true, |i| v.get_instance() == i))
-                .filter(|v| index.map_or(true, |i| v.get_index() == i));
+        nodes.iter()
+            .map(|n| {
+                devices.insert(Device {
+                    node: n.clone(),
+                    values: values.iter()
+                        .cloned()
+                        .filter(|v| v.get_node_id() == n.get_id())
+                        .collect(),
+                })
+            })
+            .collect::<Vec<_>>();
 
-        filtered_values.collect()
+        self.devices = Some(devices);
+    }
+
+    pub fn state(&self) -> MutexGuard<State> {
+        self.manager.get_state()
     }
 }
 
 fn spawn_notification_thread(output: Sender<ValueID>,
-                             rx: recv_wrap::Receiver<ZWaveNotification>,
+                             rx: Receiver<ZWaveNotification>,
                              ready: CVar) {
-    ::mioco::spawn(move || {
+    ::std::thread::spawn(move || {
         for not in rx {
             match not {
                 ZWaveNotification::AllNodesQueried(_) |
@@ -86,6 +109,7 @@ fn spawn_notification_thread(output: Sender<ValueID>,
                 }
 
                 ZWaveNotification::ValueAdded(v) |
+                ZWaveNotification::ValueRefreshed(v) |
                 ZWaveNotification::ValueChanged(v) => {
                     output.send(v).unwrap();
                 }

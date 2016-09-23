@@ -2,8 +2,8 @@
 #![feature(conservative_impl_trait)]
 #![feature(question_mark)]
 #![allow(dead_code)]
-
-extern crate mioco;
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 
 extern crate rustc_serialize;
 extern crate toml;
@@ -22,6 +22,8 @@ extern crate shellexpand;
 extern crate openzwave_stateful;
 
 extern crate mqtt3;
+extern crate mqttc;
+extern crate netopt;
 
 pub mod config;
 pub use config::Config;
@@ -34,5 +36,4 @@ pub mod zwave_testing;
 
 pub mod bus;
 
-mod cvar;
-mod recv_wrap;
+mod util;

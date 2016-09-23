@@ -1,16 +1,19 @@
 [mqtt]
-broker = "10.8.0.1:1883"
+broker = "10.8.254.1:1883"
+item_base = "catt/items"
 client-id = "catt-zwave"
 
 [zwave]
 port = "/dev/ttyUSB0"
+expose_unbound = true
+sys_config = "/tmp/nothing_here"
+user_config = "/tmp/user_nothing_here"
 
 [[zwave.device]]
-id = 13
+id = 1
 name = "controller"
-command = "controller"
 
 [[zwave.device]]
-id = 8
+id = 2
 name = "Light_Living_Table"
-command = "switch_binary"
+command = "switch_multilevel"
