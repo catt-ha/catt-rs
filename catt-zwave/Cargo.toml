@@ -1,0 +1,8 @@
+[package]
+name = "catt-zwave"
+version = "0.1.0"
+authors = ["Josh Chase <jcjoshuachase@gmail.com>"]
+
+[dependencies]
+catt-core = { path = "../catt-core" }
+log = "*"

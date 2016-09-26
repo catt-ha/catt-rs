@@ -1,0 +1,16 @@
+[package]
+name = "catt-mqtt"
+version = "0.1.0"
+authors = ["Josh Chase <jcjoshuachase@gmail.com>"]
+
+[dependencies]
+catt-core = { path = "../catt-core" }
+error-chain = "*"
+mqtt3 = "*"
+mqttc = "*"
+netopt = "*"
+log = "*"
+rustc-serialize = "*"
+
+[dev-dependencies]
+env_logger = "*"

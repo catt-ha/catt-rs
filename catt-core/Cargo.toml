@@ -1,0 +1,10 @@
+[package]
+name = "catt-core"
+version = "0.1.0"
+authors = ["Josh Chase <jcjoshuachase@gmail.com>"]
+
+[dependencies]
+toml = "*"
+error-chain = "*"
+rustc-serialize = "*"
+log = "*"

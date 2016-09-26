@@ -17,5 +17,9 @@ rustc-serialize = "*"
 error-chain = "*"
 env_logger = "*"
 
+catt-core = { path = "./catt-core" }
+catt-mqtt = { path = "./catt-mqtt" }
+catt-zwave = { path = "./catt-zwave" }
+
 [[bin]]
 name = "zwave"
