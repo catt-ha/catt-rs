@@ -66,10 +66,7 @@ impl Mqtt {
     }
 
     fn get_client(&self) -> MutexGuard<mqttc::Client> {
-        match self.client.lock() {
-            Ok(cl) => cl,
-            Err(poisoned) => poisoned.into_inner(),
-        }
+        ::catt_core::util::always_lock(self.client.lock())
     }
 
     pub fn get_message(&self) -> Result<Option<(String, Arc<Vec<u8>>)>> {
@@ -98,10 +95,7 @@ fn spawn_message_thread(client: Arc<Mutex<mqttc::Client>>, tx: Sender<Message>) 
         loop {
             debug!("locking client");
             let message = {
-                let mut cl = match client.lock() {
-                    Ok(g) => g,
-                    Err(e) => e.into_inner(),
-                };
+                let mut cl = ::catt_core::util::always_lock(client.lock());
 
                 debug!("receiving message");
                 cl.await()
@@ -158,7 +152,7 @@ fn spawn_message_thread(client: Arc<Mutex<mqttc::Client>>, tx: Sender<Message>) 
 
 pub struct MqttBus {
     client: Mqtt,
-    messages: Arc<Receiver<Message>>,
+    messages: Arc<Mutex<Receiver<Message>>>,
 }
 
 impl From<Mqtt> for MqttBus {
@@ -167,7 +161,7 @@ impl From<Mqtt> for MqttBus {
         spawn_message_thread(other.client.clone(), tx);
         MqttBus {
             client: other,
-            messages: Arc::new(rx),
+            messages: Arc::new(Mutex::new(rx)),
         }
     }
 }
@@ -194,7 +188,7 @@ impl Bus for MqttBus {
         }
     }
 
-    fn messages(&self) -> Arc<Receiver<Message>> {
+    fn messages(&self) -> Arc<Mutex<Receiver<Message>>> {
         self.messages.clone()
     }
 }
@@ -238,7 +232,7 @@ mod test {
                 value: "Testing!".into(),
             })
             .unwrap();
-        let msg = messages.recv().unwrap();
+        let msg = messages.lock().unwrap().recv().unwrap();
         info!("got: {:?}", String::from_utf8(msg.value).unwrap());
     }
 }

@@ -1,30 +1,18 @@
-use std::collections::BTreeSet;
+use std::collections::BTreeMap;
 
 use std::sync::Arc;
+use std::sync::Mutex;
 use std::sync::mpsc::Receiver;
+
+pub enum ValueType {}
 
 pub trait Value {
     type Error: ::std::error::Error;
 
     fn get_name(&self) -> String;
 
-    fn get_string(&self) -> Result<String, Self::Error>;
-    fn set_string(&self, &str) -> Result<(), Self::Error>;
-
-    fn get_raw(&self) -> Result<Vec<u8>, Self::Error>;
-    fn set_raw(&self, &[u8]) -> Result<(), Self::Error>;
-
-    fn get_int(&self) -> Result<i64, Self::Error>;
-    fn set_int(&self, i64) -> Result<i64, Self::Error>;
-
-    fn get_unsigned(&self) -> Result<u64, Self::Error>;
-    fn set_unsigned(&self, u64) -> Result<(), Self::Error>;
-
-    fn get_float(&self) -> Result<f64, Self::Error>;
-    fn set_float(&self, f64) -> Result<(), Self::Error>;
-
-    fn get_bool(&self) -> Result<bool, Self::Error>;
-    fn set_bool(&self, bool) -> Result<(), Self::Error>;
+    fn get_value(&self) -> Result<Vec<u8>, Self::Error>;
+    fn set_value(&self, &[u8]) -> Result<(), Self::Error>;
 }
 
 pub enum Notification<T> {
@@ -35,8 +23,8 @@ pub enum Notification<T> {
 
 pub trait Binding {
     type Error: ::std::error::Error;
-    type Value: Value;
+    type Value: Value + Send + 'static + Clone;
 
-    fn get_values(&self) -> BTreeSet<Self::Value>;
-    fn get_notifications(&self) -> Arc<Receiver<Notification<Self::Value>>>;
+    fn get_values(&self) -> BTreeMap<String, Self::Value>;
+    fn notifications(&self) -> Arc<Mutex<Receiver<Notification<Self::Value>>>>;
 }
