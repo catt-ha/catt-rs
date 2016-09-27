@@ -1,6 +1,4 @@
-use mqttc;
-use mqtt3;
-
+use rumqtt;
 error_chain!{
 
     foreign_links {
@@ -9,25 +7,20 @@ error_chain!{
     }
 
     errors {
-        Mqttc(e: mqttc::Error) {
-            description("Mqtt client error")
-            display("Mqtt client error: {:?}", e)
+        Mqtt(e: rumqtt::Error) {
+            description("mqtt error")
+            display("mqtt error: {:?}", e)
         }
-        Mqtt3(e: mqtt3::Error) {
-            description("Mqtt proto error")
-                display("Mqtt proto error: {:?}", e)
+
+        NotStarted {
+            description("mqtt client not started")
+            display("mqtt client not started")
         }
     }
 }
 
-impl From<mqttc::Error> for Error {
-    fn from(other: mqttc::Error) -> Self {
-        ErrorKind::Mqttc(other).into()
-    }
-}
-
-impl From<mqtt3::Error> for Error {
-    fn from(other: mqtt3::Error) -> Self {
-        ErrorKind::Mqtt3(other).into()
+impl From<rumqtt::Error> for Error {
+    fn from(other: rumqtt::Error) -> Self {
+        ErrorKind::Mqtt(other).into()
     }
 }

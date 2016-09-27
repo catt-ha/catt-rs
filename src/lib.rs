@@ -14,7 +14,6 @@ extern crate catt_mqtt;
 
 use catt_core::bridge::Bridge;
 use catt_mqtt::mqtt::MqttBus;
-use catt_mqtt::mqtt::Mqtt;
 use catt_zwave::zwave::driver::ZWave;
 
 extern crate rustc_serialize;
@@ -27,6 +26,5 @@ use errors::*;
 
 pub fn init(config_file: &str) -> Result<Bridge<MqttBus, ZWave>> {
     let cfg = config::Config::from_file(config_file)?;
-    Ok(Bridge::new(Mqtt::with_config(&cfg.mqtt)?.into(),
-                   ZWave::new(&cfg.zwave)?))
+    Ok(Bridge::new(MqttBus::with_config(&cfg.mqtt)?, ZWave::new(&cfg.zwave)?))
 }

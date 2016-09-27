@@ -9,9 +9,7 @@ extern crate error_chain;
 #[macro_use]
 extern crate log;
 
-extern crate mqttc;
-extern crate mqtt3;
-extern crate netopt;
+extern crate rumqtt;
 
 extern crate rustc_serialize;
 

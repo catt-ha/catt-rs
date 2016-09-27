@@ -15,6 +15,6 @@ name = "controller"
 
 [[zwave.device]]
 id = 2
-name = "Light_Living_Table"
+name = "Test_Switch"
 zwave_label = "level"
 value_type = "int"

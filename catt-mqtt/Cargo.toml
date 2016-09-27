@@ -6,11 +6,9 @@ authors = ["Josh Chase <jcjoshuachase@gmail.com>"]
 [dependencies]
 catt-core = { path = "../catt-core" }
 error-chain = "*"
-mqtt3 = "*"
-mqttc = "*"
-netopt = "*"
 log = "*"
 rustc-serialize = "*"
+rumqtt = { path = "./RuMqtt" }
 
 [dev-dependencies]
 env_logger = "*"

@@ -1,10 +1,4 @@
-use netopt;
-
-use mqttc;
-use mqttc::PubSub;
-use mqttc::PubOpt;
-
-use mqtt3::QoS;
+use rumqtt;
 
 use config::Config;
 use config::MQTT_BASE_DEFAULT;
@@ -29,27 +23,63 @@ use errors::*;
 
 pub struct Mqtt {
     cfg: Config,
-    client: Arc<Mutex<mqttc::Client>>,
+    client: Option<rumqtt::MqttClient>,
+    requester: Option<rumqtt::MqRequest>,
 }
 
 impl Mqtt {
     pub fn with_config(cfg: &Config) -> Result<Mqtt> {
-        let mut net_opts = netopt::NetworkOptions::new();
-        if cfg.tls.unwrap_or(false) {
-            net_opts.tls(Default::default());
-        }
+        let mut client_options = rumqtt::MqttOptions::new()
+            .set_keep_alive(5)
+            .set_reconnect(3);
 
-        let mut client_opts = mqttc::ClientOptions::new();
+        // let mut net_opts = netopt::NetworkOptions::new();
+        // if cfg.tls.unwrap_or(false) {
+        //     net_opts.tls(Default::default());
+        // }
 
-        cfg.client_id.clone().map(|id| client_opts.set_client_id(id.into()));
+        match &cfg.client_id {
+            &Some(ref id) => client_options = client_options.set_client_id(&id),
+            &None => {}
+        };
 
         let addr: &str = cfg.broker.as_ref();
-        let client = Arc::new(Mutex::new(client_opts.connect(addr, net_opts)?));
+        client_options = client_options.broker(addr);
+
+
+        let client = rumqtt::MqttClient::new(client_options);
 
         Ok(Mqtt {
             cfg: cfg.clone(),
-            client: client,
+            client: Some(client),
+            requester: None,
         })
+    }
+
+    pub fn with_callback<F>(mut self, cb: F) -> Self
+        where F: Fn(rumqtt::Message) + Send + Sync + 'static
+    {
+        self.client = match self.client.take() {
+            Some(cl) => Some(cl.message_callback(cb)),
+            None => None,
+        };
+
+        self
+    }
+
+    pub fn start(mut self) -> Result<Self> {
+        let (client, requester) = match (self.client.take(), self.requester.take()) {
+            (Some(cl), _) => {
+                let requester = cl.start()?;
+                (None, Some(requester))
+            }
+            (None, Some(req)) => (None, Some(req)),
+            (cl, req) => (cl, req),
+        };
+
+        self.client = client;
+        self.requester = requester;
+        Ok(self)
     }
 
     pub fn publish(&self, path: &str, state: &[u8]) -> Result<()> {
@@ -58,24 +88,10 @@ impl Mqtt {
             None => format!("{}/{}", MQTT_BASE_DEFAULT, path),
         };
 
-        let pub_opt = PubOpt::new(QoS::from_u8(self.cfg.qos.clone().unwrap_or(MQTT_QOS_DEFAULT))?,
-                                  false);
-
-        debug!("publishing to {}", pub_path);
-        Ok(self.get_client().publish(pub_path, Vec::from(state), pub_opt)?)
-    }
-
-    fn get_client(&self) -> MutexGuard<mqttc::Client> {
-        ::catt_core::util::always_lock(self.client.lock())
-    }
-
-    pub fn get_message(&self) -> Result<Option<(String, Arc<Vec<u8>>)>> {
-        let message = self.get_client().await()?;
-
-        Ok(message.map(|m| {
-            let value = m.payload.clone();
-            (m.topic.path, value)
-        }))
+        match self.requester {
+            Some(ref req) => Ok(req.publish(&pub_path, rumqtt::QoS::Level0, state.into())?),
+            None => Err(ErrorKind::NotStarted.into()),
+        }
     }
 
     pub fn subscribe(&self, path: &str) -> Result<()> {
@@ -84,70 +100,11 @@ impl Mqtt {
             None => format!("{}/{}", MQTT_BASE_DEFAULT, path),
         };
 
-        debug!("subscribing to {}", sub_path);
-
-        Ok(self.get_client().subscribe(sub_path.as_str())?)
-    }
-}
-
-fn spawn_message_thread(client: Arc<Mutex<mqttc::Client>>, tx: Sender<Message>) {
-    thread::spawn(move || {
-        loop {
-            debug!("locking client");
-            let message = {
-                let mut cl = ::catt_core::util::always_lock(client.lock());
-
-                debug!("receiving message");
-                cl.await()
-            };
-
-            let message = match message {
-                Ok(m) => m,
-                Err(e) => {
-                    warn!("mqtt await error: {:?}", e);
-                    continue;
-                }
-            };
-
-
-            let message = match message {
-                Some(m) => m,
-                None => continue,
-            };
-
-            let topic = message.topic.path.split("/").collect::<Vec<&str>>();
-
-            if topic.len() < 2 {
-                warn!("message with invalid path received: {}", message.topic.path);
-                continue;
-            }
-
-            let item_name = topic[topic.len() - 2];
-
-            let message_type_str = topic[topic.len() - 1];
-            let message_type = match message_type_str {
-                "state" => MessageType::Update,
-                "command" => MessageType::Command,
-                _ => {
-                    warn!("invalid message type: {}", message_type_str);
-                    continue;
-                }
-            };
-
-            let value: Vec<u8> = (&*message.payload).clone();
-
-            let message = Message {
-                message_type: message_type,
-                item_name: String::from(item_name),
-                value: value,
-            };
-
-            match tx.send(message) {
-                Ok(_) => {}
-                Err(e) => warn!("channel send error: {}", e),
-            }
+        match self.requester {
+            Some(ref req) => Ok(req.subscribe(vec![(&sub_path, rumqtt::QoS::Level0)])?),
+            None => Err(ErrorKind::NotStarted.into()),
         }
-    });
+    }
 }
 
 pub struct MqttBus {
@@ -155,14 +112,52 @@ pub struct MqttBus {
     messages: Arc<Mutex<Receiver<Message>>>,
 }
 
-impl From<Mqtt> for MqttBus {
-    fn from(other: Mqtt) -> MqttBus {
+impl MqttBus {
+    pub fn with_config(cfg: &Config) -> Result<Self> {
         let (tx, rx) = channel();
-        spawn_message_thread(other.client.clone(), tx);
-        MqttBus {
-            client: other,
+        let tx = Mutex::new(tx);
+
+        let client = Mqtt::with_config(cfg)?
+            .with_callback(move |message| {
+                let topic = message.topic.as_str().split("/").collect::<Vec<&str>>();
+
+                if topic.len() < 2 {
+                    warn!("message with invalid path received: {}",
+                          message.topic.as_str());
+                    return;
+                }
+
+                let item_name = topic[topic.len() - 2];
+
+                let message_type_str = topic[topic.len() - 1];
+                let message_type = match message_type_str {
+                    "state" => MessageType::Update,
+                    "command" => MessageType::Command,
+                    _ => {
+                        warn!("invalid message type: {}", message_type_str);
+                        return;
+                    }
+                };
+
+                let value: Vec<u8> = (&*message.payload).clone();
+
+                let message = Message {
+                    message_type: message_type,
+                    item_name: String::from(item_name),
+                    value: value,
+                };
+
+                match ::catt_core::util::always_lock(tx.lock()).send(message) {
+                    Ok(_) => {}
+                    Err(e) => warn!("channel send error: {}", e),
+                }
+            })
+            .start()?;
+
+        Ok(MqttBus {
+            client: client,
             messages: Arc::new(Mutex::new(rx)),
-        }
+        })
     }
 }
 

@@ -36,6 +36,8 @@ impl DeviceConfig {
             Some(ref cc_str) => {
                 if cc_match(cc_str, value_id) {
                     strength += 1;
+                } else {
+                    return 0;
                 }
             }
             None => {}
@@ -45,6 +47,8 @@ impl DeviceConfig {
             Some(ref vt_str) => {
                 if vt_match(vt_str, value_id) {
                     strength += 1;
+                } else {
+                    return 0;
                 }
             }
             None => {}
@@ -55,6 +59,8 @@ impl DeviceConfig {
                 if label.to_lowercase() == value_id.get_label().to_lowercase() {
                     debug!("label matched!");
                     strength += 1;
+                } else {
+                    return 0;
                 }
             }
             None => {}
