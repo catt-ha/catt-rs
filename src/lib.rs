@@ -5,35 +5,28 @@
 #![allow(unused_imports)]
 #![allow(unused_variables)]
 
-extern crate rustc_serialize;
-extern crate toml;
-
 #[macro_use]
 extern crate error_chain;
 
-#[macro_use]
-extern crate lazy_static;
+extern crate catt_core;
+extern crate catt_zwave;
+extern crate catt_mqtt;
 
-#[macro_use]
-extern crate log;
+use catt_core::bridge::Bridge;
+use catt_mqtt::mqtt::MqttBus;
+use catt_mqtt::mqtt::Mqtt;
+use catt_zwave::zwave::driver::ZWave;
 
-extern crate shellexpand;
+extern crate rustc_serialize;
+extern crate toml;
 
-extern crate openzwave_stateful;
+mod config;
+mod errors;
 
-extern crate mqtt3;
-extern crate mqttc;
-extern crate netopt;
+use errors::*;
 
-pub mod config;
-pub use config::Config;
-
-pub mod manager;
-pub use manager::Manager;
-
-pub mod zwave;
-pub mod zwave_testing;
-
-pub mod bus;
-
-mod util;
+pub fn init(config_file: &str) -> Result<Bridge<MqttBus, ZWave>> {
+    let cfg = config::Config::from_file(config_file)?;
+    Ok(Bridge::new(Mqtt::with_config(&cfg.mqtt)?.into(),
+                   ZWave::new(&cfg.zwave)?))
+}

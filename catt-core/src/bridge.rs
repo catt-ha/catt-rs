@@ -9,6 +9,7 @@ use binding::Value;
 use binding::Notification;
 
 use bus::Bus;
+use bus::SubType;
 use bus::Message;
 use bus::MessageType;
 
@@ -24,11 +25,16 @@ impl<B, C> Bridge<B, C>
           C: ::binding::Binding
 {
     pub fn new(bus: B, binding: C) -> Self {
+        let values = binding.get_values();
+        for (name, _) in values.iter() {
+            bus.subscribe(name, SubType::Command);
+        }
+
         let bus_messages = bus.messages();
         let bus = Arc::new(Mutex::new(bus));
         let binding = Arc::new(binding);
 
-        let devices = Arc::new(Mutex::new(binding.get_values()));
+        let devices = Arc::new(Mutex::new(values));
 
         spawn_bus_to_binding(bus_messages, devices.clone());
         spawn_binding_to_bus(binding.notifications(), bus.clone());

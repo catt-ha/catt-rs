@@ -27,7 +27,8 @@ pub struct ZWave {
 }
 
 impl ZWave {
-    pub fn new(cfg: ZWaveConfig) -> Result<ZWave> {
+    pub fn new(cfg: &ZWaveConfig) -> Result<ZWave> {
+        let cfg = cfg.clone();
         let (manager, notifications) = {
             let sys_config: ozw::ConfigPath = cfg.sys_config
                 .as_ref()
