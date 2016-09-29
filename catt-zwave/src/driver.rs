@@ -64,9 +64,9 @@ impl ZWave {
 
 impl Binding for ZWave {
     type Error = Error;
-    type Value = Value;
+    type Item = Value;
 
-    fn get_values(&self) -> BTreeMap<String, Self::Value> {
+    fn get_values(&self) -> BTreeMap<String, Self::Item> {
         let values_lock = ::catt_core::util::always_lock(self.values.lock());
 
         values_lock.iter()
@@ -74,7 +74,7 @@ impl Binding for ZWave {
             .collect()
     }
 
-    fn notifications(&self) -> Arc<Mutex<Receiver<Notification<Self::Value>>>> {
+    fn notifications(&self) -> Arc<Mutex<Receiver<Notification<Self::Item>>>> {
         self.notifications.clone()
     }
 }

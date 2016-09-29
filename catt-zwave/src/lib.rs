@@ -13,8 +13,12 @@ extern crate catt_core;
 
 extern crate rustc_serialize;
 
-pub mod zwave;
 pub mod config;
+pub mod device;
+pub mod driver;
+pub mod errors;
+pub mod class;
+pub mod value;
 
 #[cfg(test)]
 extern crate env_logger;

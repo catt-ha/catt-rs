@@ -2,33 +2,30 @@ use rumqtt;
 
 use config::Config;
 use config::MQTT_BASE_DEFAULT;
-use config::MQTT_QOS_DEFAULT;
 
 use std::sync::Arc;
 use std::sync::Mutex;
-use std::sync::MutexGuard;
 
 use std::sync::mpsc::channel;
 use std::sync::mpsc::Receiver;
-use std::sync::mpsc::Sender;
-
-use std::thread;
 
 use catt_core::bus::Bus;
 use catt_core::bus::Message;
 use catt_core::bus::MessageType;
 use catt_core::bus::SubType;
 
+use catt_core::value::Value;
+
 use errors::*;
 
-pub struct Mqtt {
+pub struct MqttClient {
     cfg: Config,
     client: Option<rumqtt::MqttClient>,
     requester: Option<rumqtt::MqRequest>,
 }
 
-impl Mqtt {
-    pub fn with_config(cfg: &Config) -> Result<Mqtt> {
+impl MqttClient {
+    pub fn with_config(cfg: &Config) -> Result<MqttClient> {
         let mut client_options = rumqtt::MqttOptions::new()
             .set_keep_alive(5)
             .set_reconnect(3);
@@ -49,7 +46,7 @@ impl Mqtt {
 
         let client = rumqtt::MqttClient::new(client_options);
 
-        Ok(Mqtt {
+        Ok(MqttClient {
             cfg: cfg.clone(),
             client: Some(client),
             requester: None,
@@ -107,17 +104,17 @@ impl Mqtt {
     }
 }
 
-pub struct MqttBus {
-    client: Mqtt,
+pub struct Mqtt {
+    client: MqttClient,
     messages: Arc<Mutex<Receiver<Message>>>,
 }
 
-impl MqttBus {
+impl Mqtt {
     pub fn with_config(cfg: &Config) -> Result<Self> {
         let (tx, rx) = channel();
         let tx = Mutex::new(tx);
 
-        let client = Mqtt::with_config(cfg)?
+        let client = MqttClient::with_config(cfg)?
             .with_callback(move |message| {
                 let topic = message.topic.as_str().split("/").collect::<Vec<&str>>();
 
@@ -139,7 +136,8 @@ impl MqttBus {
                     }
                 };
 
-                let value: Vec<u8> = (&*message.payload).clone();
+                let payload = &*message.payload;
+                let value = Value::from_raw(payload);
 
                 let message = Message {
                     message_type: message_type,
@@ -154,14 +152,14 @@ impl MqttBus {
             })
             .start()?;
 
-        Ok(MqttBus {
+        Ok(Mqtt {
             client: client,
             messages: Arc::new(Mutex::new(rx)),
         })
     }
 }
 
-impl Bus for MqttBus {
+impl Bus for Mqtt {
     type Error = Error;
 
     fn publish(&self, message: Message) -> Result<()> {
@@ -172,7 +170,7 @@ impl Bus for MqttBus {
             &MessageType::Command => "command",
         };
         let path = format!("{}/{}", item_name, message_type);
-        self.client.publish(&path, value)
+        self.client.publish(&path, value.as_string()?.as_bytes())
     }
 
     fn subscribe(&self, item_name: &str, sub_type: SubType) -> Result<()> {
@@ -188,7 +186,6 @@ impl Bus for MqttBus {
     }
 }
 
-
 #[cfg(test)]
 mod test {
     use env_logger::LogBuilder;
@@ -201,7 +198,7 @@ mod test {
     use super::*;
     use super::super::config::*;
 
-    fn new_client() -> Mqtt {
+    fn new_bus() -> Mqtt {
         Mqtt::with_config(&Config {
                 broker: "10.8.0.1:1883".into(),
                 item_base: Some("catt/items".into()),
@@ -209,10 +206,6 @@ mod test {
                 ..Default::default()
             })
             .unwrap()
-    }
-
-    fn new_bus() -> MqttBus {
-        new_client().into()
     }
 
     #[test]

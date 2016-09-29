@@ -2,11 +2,13 @@ use std::sync::mpsc::Receiver;
 use std::sync::Arc;
 use std::sync::Mutex;
 
+use value::Value;
+
 #[derive(Debug)]
 pub struct Message {
     pub message_type: MessageType,
     pub item_name: String,
-    pub value: Vec<u8>,
+    pub value: Value,
 }
 
 #[derive(Debug)]

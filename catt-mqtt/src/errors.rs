@@ -1,5 +1,10 @@
 use rumqtt;
+use catt_core::value;
+
 error_chain!{
+    links {
+        value::Error, value::ErrorKind, ValueError;
+    }
 
     foreign_links {
         ::std::net::AddrParseError, AddrParseError;

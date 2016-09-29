@@ -5,13 +5,14 @@ use std::sync::Mutex;
 
 use std::sync::mpsc::Receiver;
 
-use binding::Value;
 use binding::Notification;
 
 use bus::Bus;
 use bus::SubType;
 use bus::Message;
 use bus::MessageType;
+
+use item::Item;
 
 pub struct Bridge<B, C> {
     #[allow(dead_code)]
@@ -27,7 +28,11 @@ impl<B, C> Bridge<B, C>
     pub fn new(bus: B, binding: C) -> Self {
         let values = binding.get_values();
         for (name, _) in values.iter() {
-            bus.subscribe(name, SubType::Command);
+            let res = bus.subscribe(name, SubType::Command);
+            match res {
+                Err(e) => warn!("subscribe error: {}", e),
+                _ => {}
+            }
         }
 
         let bus_messages = bus.messages();
@@ -49,7 +54,7 @@ impl<B, C> Bridge<B, C>
 
 fn spawn_bus_to_binding<V>(msgs: Arc<Mutex<Receiver<Message>>>,
                            values: Arc<Mutex<BTreeMap<String, V>>>)
-    where V: Send + 'static + Clone + Value
+    where V: Send + 'static + Clone + Item
 {
     ::std::thread::spawn(move || {
         loop {
@@ -69,7 +74,7 @@ fn spawn_bus_to_binding<V>(msgs: Arc<Mutex<Receiver<Message>>>,
                 None => continue,
             };
 
-            match val.set_value(&msg.value) {
+            match val.set_value(msg.value) {
                 Ok(_) => {}
                 Err(e) => warn!("error setting value from bus: {}", e),
             };
@@ -78,7 +83,7 @@ fn spawn_bus_to_binding<V>(msgs: Arc<Mutex<Receiver<Message>>>,
 }
 fn spawn_binding_to_bus<V, B>(notifications: Arc<Mutex<Receiver<Notification<V>>>>,
                               bus: Arc<Mutex<B>>)
-    where V: Send + 'static + Clone + Value,
+    where V: Send + 'static + Clone + Item,
           B: Send + 'static + Bus
 {
     ::std::thread::spawn(move || {
@@ -97,7 +102,7 @@ fn spawn_binding_to_bus<V, B>(notifications: Arc<Mutex<Receiver<Notification<V>>
             let value = match val.get_value() {
                 Ok(v) => v,
                 Err(e) => {
-                    warn!("error getting item value: {}", e);
+                    warn!("error getting item value: {:?}", e);
                     continue;
                 }
             };
@@ -108,7 +113,7 @@ fn spawn_binding_to_bus<V, B>(notifications: Arc<Mutex<Receiver<Notification<V>>
                 value: value,
             }) {
                 Ok(_) => {}
-                Err(e) => warn!("bus publish error: {}", e),
+                Err(e) => warn!("bus publish error: {:?}", e),
             };
         }
     });
