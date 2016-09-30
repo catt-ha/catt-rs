@@ -1,8 +1,5 @@
 #![feature(question_mark)]
 
-#[cfg(test)]
-extern crate env_logger;
-
 #[macro_use]
 extern crate error_chain;
 
@@ -19,9 +16,3 @@ pub mod errors;
 pub mod config;
 
 pub mod mqtt;
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {}
-}
