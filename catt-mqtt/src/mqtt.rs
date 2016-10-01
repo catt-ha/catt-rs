@@ -37,7 +37,7 @@ impl MqttClient {
             &None => {}
         };
 
-        let addr: &str = cfg.broker.as_ref();
+        let addr: &str = cfg.broker.as_ref().map(|b| b.as_str()).unwrap_or("127.0.0.1:1883");
         client_options = client_options.broker(addr);
 
 

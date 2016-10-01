@@ -9,6 +9,7 @@ use std::sync::mpsc::Sender;
 use catt_core::util::always_lock;
 use catt_core::binding::Binding;
 use catt_core::binding::Notification;
+use catt_core::item::Item as CItem;
 
 use openzwave_stateful as ozw;
 use openzwave_stateful::ValueID;
@@ -17,6 +18,7 @@ use openzwave_stateful::ValueType;
 use openzwave_stateful::ZWaveNotification;
 
 use config::ZWaveConfig;
+
 use super::errors::*;
 use super::item::Item;
 
@@ -25,6 +27,8 @@ pub struct ZWave {
     #[allow(dead_code)]
     ozw_manager: Arc<ozw::ZWaveManager>,
     notifications: Arc<Mutex<Receiver<Notification<Item>>>>,
+    // TODO improve this system - ideally, we should hide these behind another struct
+    // so that only one call is needed to update both.
     values: Arc<Mutex<BTreeMap<ValueID, String>>>,
     catt_values: Arc<Mutex<BTreeMap<String, Item>>>,
 }
@@ -107,7 +111,7 @@ fn spawn_notification_thread(driver: ZWave,
                             (name, exists)
                         }
                         None => {
-                            if cfg.expose_unbound {
+                            if cfg.expose_unbound.unwrap_or(true) {
                                 if let Some(name) = db.get(&v) {
                                     warn!("duplicate match found for unconfigured {}", name);
                                     (name.clone(), true)
@@ -120,12 +124,12 @@ fn spawn_notification_thread(driver: ZWave,
                             }
                         }
                     };
+                    let item = Item::new(&name, v);
                     if !exists {
                         db.insert(v, name.clone());
-                        always_lock(driver.catt_values.lock())
-                            .insert(name.clone(), Item::new(&name, v));
+                        always_lock(driver.catt_values.lock()).insert(name.clone(), item.clone());
                     }
-                    Notification::Added(Item::new(&name, v))
+                    Notification::Added(item)
                 }
 
                 ZWaveNotification::ValueChanged(v) => {
@@ -137,8 +141,9 @@ fn spawn_notification_thread(driver: ZWave,
                         Some(n) => n,
                         None => continue,
                     };
-                    debug!("value {} changed: {}", name, v);
-                    Notification::Changed(Item::new(&name, v))
+                    let item = Item::new(&name, v);
+                    debug!("value {} changed: {:?}", item.get_name(), item.get_value());
+                    Notification::Changed(item)
                 }
 
                 ZWaveNotification::ValueRemoved(v) => {

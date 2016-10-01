@@ -12,6 +12,9 @@ extern crate catt_core;
 extern crate catt_zwave;
 extern crate catt_mqtt;
 
+#[macro_use]
+extern crate log;
+
 use catt_core::bridge::Bridge;
 use catt_mqtt::mqtt::Mqtt;
 use catt_zwave::driver::ZWave;

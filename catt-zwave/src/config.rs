@@ -8,7 +8,7 @@ pub struct ZWaveConfig {
     pub sys_config: Option<String>,
     pub user_config: Option<String>,
     pub device: Vec<DeviceConfig>,
-    pub expose_unbound: bool,
+    pub expose_unbound: Option<bool>,
 }
 
 #[derive(RustcDecodable,Debug,Clone,Default)]

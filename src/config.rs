@@ -11,7 +11,7 @@ use rustc_serialize::Decodable;
 
 use errors::*;
 
-#[derive(RustcDecodable)]
+#[derive(RustcDecodable,Default)]
 pub struct Config {
     pub mqtt: ::catt_mqtt::config::Config,
     pub zwave: ::catt_zwave::config::ZWaveConfig,
@@ -25,7 +25,13 @@ impl Config {
 
 fn read_config(file_name: &str) -> Result<Config> {
     let mut buf = String::new();
-    let mut file = File::open(file_name)?;
+    let mut file = match File::open(file_name) {
+        Ok(f) => f,
+        Err(e) => {
+            warn!("failed to read config at {} with error {:?}", file_name, e);
+            return Ok(Default::default());
+        }
+    };
 
     file.read_to_string(&mut buf)?;
 
