@@ -18,11 +18,13 @@ use config::ZWaveConfig;
 use super::errors::*;
 use super::item::Item;
 
+#[derive(Clone)]
 pub struct ZWave {
     #[allow(dead_code)]
     ozw_manager: Arc<ozw::ZWaveManager>,
     notifications: Arc<Mutex<Receiver<Notification<Item>>>>,
-    values: Arc<Mutex<BTreeMap<ValueID, (String, u8)>>>,
+    values: Arc<Mutex<BTreeMap<ValueID, String>>>,
+    catt_values: Arc<Mutex<BTreeMap<String, Item>>>,
 }
 
 impl ZWave {
@@ -44,17 +46,18 @@ impl ZWave {
             })?
         };
 
-        let value_db = Arc::new(Mutex::new(BTreeMap::new()));
-
         let (tx, rx) = channel();
 
-        spawn_notification_thread(value_db.clone(), cfg, tx, notifications);
-
-        Ok(ZWave {
+        let driver = ZWave {
             ozw_manager: manager,
             notifications: Arc::new(Mutex::new(rx)),
-            values: value_db,
-        })
+            values: Default::default(),
+            catt_values: Default::default(),
+        };
+
+        spawn_notification_thread(driver.clone(), cfg, tx, notifications);
+
+        Ok(driver)
     }
 }
 
@@ -62,12 +65,8 @@ impl Binding for ZWave {
     type Error = Error;
     type Item = Item;
 
-    fn get_values(&self) -> BTreeMap<String, Self::Item> {
-        let values_lock = ::catt_core::util::always_lock(self.values.lock());
-
-        values_lock.iter()
-            .map(|(k, v)| (v.0.clone(), Item::new(&v.0, *k)))
-            .collect()
+    fn get_values(&self) -> Arc<Mutex<BTreeMap<String, Self::Item>>> {
+        self.catt_values.clone()
     }
 
     fn notifications(&self) -> Arc<Mutex<Receiver<Notification<Self::Item>>>> {
@@ -75,7 +74,7 @@ impl Binding for ZWave {
     }
 }
 
-fn spawn_notification_thread(db: Arc<Mutex<BTreeMap<ValueID, (String, u8)>>>,
+fn spawn_notification_thread(driver: ZWave,
                              cfg: ZWaveConfig,
                              output: Sender<Notification<Item>>,
                              rx: Receiver<ZWaveNotification>) {
@@ -91,15 +90,18 @@ fn spawn_notification_thread(db: Arc<Mutex<BTreeMap<ValueID, (String, u8)>>>,
 
                 ZWaveNotification::ValueAdded(v) => {
                     let name = match cfg.lookup_device(v) {
-                        Some((name, strength)) => {
-                            let mut db = always_lock(db.lock());
-                            let better = if let Some(&(_, db_strength)) = db.get(&v) {
-                                strength > db_strength
-                            } else {
+                        Some(name) => {
+                            let mut db = always_lock(driver.values.lock());
+                            let exists = if let Some(_) = db.get(&v) {
+                                warn!("duplicate match found for {}", name);
                                 true
+                            } else {
+                                false
                             };
-                            if better {
-                                db.insert(v, (name.clone(), strength));
+                            if !exists {
+                                db.insert(v, name.clone());
+                                always_lock(driver.catt_values.lock())
+                                    .insert(name.clone(), Item::new(&name, v));
                             }
                             name
                         }
@@ -112,9 +114,9 @@ fn spawn_notification_thread(db: Arc<Mutex<BTreeMap<ValueID, (String, u8)>>>,
                 }
 
                 ZWaveNotification::ValueChanged(v) => {
-                    let db = always_lock(db.lock());
+                    let db = always_lock(driver.values.lock());
                     let name = match db.get(&v) {
-                        Some(&(ref n, _)) => n,
+                        Some(n) => n,
                         None => continue,
                     };
                     debug!("value {} changed: {}", name, v);
@@ -122,13 +124,14 @@ fn spawn_notification_thread(db: Arc<Mutex<BTreeMap<ValueID, (String, u8)>>>,
                 }
 
                 ZWaveNotification::ValueRemoved(v) => {
-                    let mut db = always_lock(db.lock());
+                    let mut db = always_lock(driver.values.lock());
                     let name = match db.get(&v) {
-                        Some(&(ref n, _)) => n.clone(),
+                        Some(n) => n.clone(),
                         None => continue,
                     };
                     debug!("removing value {} from db", name);
                     db.remove(&v);
+                    always_lock(driver.catt_values.lock()).remove(&name);
                     Notification::Removed(Item::new(&name, v))
                 }
 

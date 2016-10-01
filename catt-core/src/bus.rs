@@ -25,6 +25,7 @@ pub trait Bus {
 
     fn publish(&self, Message) -> Result<(), Self::Error>;
     fn subscribe(&self, item_name: &str, SubType) -> Result<(), Self::Error>;
+    fn unsubscribe(&self, item_name: &str, SubType) -> Result<(), Self::Error>;
 
     fn messages(&self) -> Arc<Mutex<Receiver<Message>>>;
 }

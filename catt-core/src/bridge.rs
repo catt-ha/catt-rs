@@ -29,20 +29,10 @@ impl<B, C> Bridge<B, C>
           C: ::binding::Binding
 {
     pub fn new(bus: B, binding: C) -> Self {
-        let values = binding.get_values();
-        for (name, _) in values.iter() {
-            let res = bus.subscribe(name, SubType::Command);
-            match res {
-                Err(e) => warn!("subscribe error: {:?}", e),
-                _ => {}
-            }
-        }
-
+        let devices = binding.get_values();
         let bus_messages = bus.messages();
         let bus = Arc::new(Mutex::new(bus));
         let binding = Arc::new(binding);
-
-        let devices = Arc::new(Mutex::new(values));
 
         let handles = vec![spawn_bus_to_binding(bus_messages, devices.clone()),
                            spawn_binding_to_bus(binding.notifications(), bus.clone())];
@@ -108,15 +98,22 @@ fn spawn_binding_to_bus<V, B>(notifications: Arc<Mutex<Receiver<Notification<V>>
 
             let mut meta: Option<Meta> = None;
             let mut skip_state = false;
+            let mut new_sub = false;
+            let mut remove_sub = false;
 
             let val = match notification {
+                Notification::Changed(v) => v,
                 Notification::Added(v) => {
                     meta = v.get_meta();
                     skip_state = true;
+                    new_sub = true;
                     v
                 }
-                Notification::Changed(v) => v,
-                _ => continue,
+                Notification::Removed(v) => {
+                    remove_sub = true;
+                    skip_state = true;
+                    v
+                }
             };
 
             let value = match val.get_value() {
@@ -131,6 +128,20 @@ fn spawn_binding_to_bus<V, B>(notifications: Arc<Mutex<Receiver<Notification<V>>
                 if let Err(e) = ::util::always_lock(bus.lock())
                     .publish(Message::Meta(val.get_name(), meta)) {
                     warn!("bus publish error: {:?}", e);
+                }
+            }
+
+            if new_sub {
+                if let Err(e) = ::util::always_lock(bus.lock())
+                    .subscribe(&val.get_name(), SubType::Command) {
+                    warn!("bus subscribe error: {:?}", e);
+                }
+            }
+
+            if remove_sub {
+                if let Err(e) = ::util::always_lock(bus.lock())
+                    .unsubscribe(&val.get_name(), SubType::Command) {
+                    warn!("bus unsubscribe error: {:?}", e);
                 }
             }
 

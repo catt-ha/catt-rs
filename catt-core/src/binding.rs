@@ -16,6 +16,6 @@ pub trait Binding {
     type Error: ::std::error::Error;
     type Item: Item + Send + 'static + Clone;
 
-    fn get_values(&self) -> BTreeMap<String, Self::Item>;
+    fn get_values(&self) -> Arc<Mutex<BTreeMap<String, Self::Item>>>;
     fn notifications(&self) -> Arc<Mutex<Receiver<Notification<Self::Item>>>>;
 }

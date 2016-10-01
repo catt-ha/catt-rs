@@ -99,6 +99,21 @@ impl MqttClient {
             None => Err(ErrorKind::NotStarted.into()),
         }
     }
+
+    #[allow(unused_variables)]
+    pub fn unsubscribe(&self, path: &str) -> Result<()> {
+        // TODO once the library supports it
+        // let sub_path = match self.cfg.item_base {
+        //     Some(ref b) => format!("{}/{}", b, path),
+        //     None => format!("{}/{}", MQTT_BASE_DEFAULT, path),
+        // };
+
+        // match self.requester {
+        //     Some(ref req) => Ok(req.unsubscribe(vec![(&sub_path, rumqtt::QoS::Level0)])?),
+        //     None => Err(ErrorKind::NotStarted.into()),
+        // }
+        Ok(())
+    }
 }
 
 pub struct Mqtt {
@@ -183,6 +198,15 @@ impl Bus for Mqtt {
             SubType::Command => self.client.subscribe(&format!("{}/command", item_name)),
             SubType::Meta => self.client.subscribe(&format!("{}/meta", item_name)),
             SubType::All => self.client.subscribe(&format!("{}/#", item_name)),
+        }
+    }
+
+    fn unsubscribe(&self, item_name: &str, sub_type: SubType) -> Result<()> {
+        match sub_type {
+            SubType::Update => self.client.unsubscribe(&format!("{}/state", item_name)),
+            SubType::Command => self.client.unsubscribe(&format!("{}/command", item_name)),
+            SubType::Meta => self.client.unsubscribe(&format!("{}/meta", item_name)),
+            SubType::All => self.client.unsubscribe(&format!("{}/#", item_name)),
         }
     }
 

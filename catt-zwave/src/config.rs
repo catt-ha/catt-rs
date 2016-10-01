@@ -21,52 +21,34 @@ pub struct DeviceConfig {
 }
 
 impl DeviceConfig {
-    fn match_strength(&self, value_id: ValueID) -> u8 {
+    fn matches(&self, value_id: ValueID) -> bool {
         if value_id.get_genre() != ValueGenre::ValueGenre_User {
-            return 0;
+            return false;
         }
 
         if value_id.get_node_id() as u64 != self.id {
-            return 0;
+            return false;
         }
 
-        let mut strength = 1;
-
-        match self.command_class {
-            Some(ref cc_str) => {
-                if cc_match(cc_str, value_id) {
-                    strength += 1;
-                } else {
-                    return 0;
-                }
+        if let Some(ref cc_str) = self.command_class {
+            if !cc_match(&cc_str, value_id) {
+                return false;
             }
-            None => {}
-        };
+        }
 
-        match self.value_type {
-            Some(ref vt_str) => {
-                if vt_match(vt_str, value_id) {
-                    strength += 1;
-                } else {
-                    return 0;
-                }
+        if let Some(ref vt_str) = self.value_type {
+            if !vt_match(&vt_str, value_id) {
+                return false;
             }
-            None => {}
-        };
+        }
 
-        match self.zwave_label {
-            Some(ref label) => {
-                if label.to_lowercase() == value_id.get_label().to_lowercase() {
-                    debug!("label matched!");
-                    strength += 1;
-                } else {
-                    return 0;
-                }
+        if let Some(ref label) = self.zwave_label {
+            if !(label.to_lowercase() == value_id.get_label().to_lowercase()) {
+                return false;
             }
-            None => {}
-        };
+        }
 
-        strength
+        true
     }
 }
 
@@ -110,28 +92,18 @@ impl<'a> Ord for DeviceMatch<'a> {
 }
 
 impl ZWaveConfig {
-    pub fn lookup_device(&self, value_id: ValueID) -> Option<(String, u8)> {
-        let best = self.device
+    pub fn lookup_device(&self, value_id: ValueID) -> Option<String> {
+        let cfg = self.device
             .iter()
-            .map(|cfg| {
-                let strength = cfg.match_strength(value_id);
-                DeviceMatch {
-                    name: &cfg.name,
-                    strength: strength,
-                }
-            })
-            .max();
+            .filter(|cfg| cfg.matches(value_id))
+            .nth(0);
 
-        if best.is_none() {
+        if cfg.is_none() {
             return None;
         }
 
-        let best = best.unwrap();
+        let cfg = cfg.unwrap();
 
-        if best.strength != 0 {
-            return Some((best.name.into(), best.strength));
-        }
-
-        None
+        return Some(cfg.name.clone());
     }
 }
