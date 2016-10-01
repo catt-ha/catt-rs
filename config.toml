@@ -9,36 +9,3 @@ expose_unbound = true
 sys_config = "/etc/openzwave-git"
 user_config = "./config"
 
-[[zwave.device]]
-id = 1
-name = "controller"
-
-[[zwave.device]]
-id = 2
-name = "Test_Switch_0"
-zwave_label = "switch"
-value_type = "bool"
-
-[[zwave.device]]
-id = 5
-name = "Test_Switch_1"
-zwave_label = "switch"
-value_type = "bool"
-
-[[zwave.device]]
-id = 6
-name = "Test_Switch_2"
-zwave_label = "switch"
-value_type = "bool"
-
-[[zwave.device]]
-id = 7
-name = "Test_Switch_3"
-zwave_label = "switch"
-value_type = "bool"
-
-[[zwave.device]]
-id = 9
-name = "Test_Switch_4"
-zwave_label = "switch"
-value_type = "bool"

@@ -12,6 +12,8 @@ use catt_core::binding::Notification;
 
 use openzwave_stateful as ozw;
 use openzwave_stateful::ValueID;
+use openzwave_stateful::ValueGenre;
+use openzwave_stateful::ValueType;
 use openzwave_stateful::ZWaveNotification;
 
 use config::ZWaveConfig;
@@ -85,35 +87,51 @@ fn spawn_notification_thread(driver: ZWave,
                 ZWaveNotification::AwakeNodesQueried(_) |
                 ZWaveNotification::AllNodesQueriedSomeDead(_) => {
                     debug!("Controller ready");
+                    driver.ozw_manager.write_configs();
                     continue;
                 }
 
                 ZWaveNotification::ValueAdded(v) => {
-                    let name = match cfg.lookup_device(v) {
+                    if !should_expose(v) {
+                        continue;
+                    }
+                    let mut db = always_lock(driver.values.lock());
+                    let (name, exists) = match cfg.lookup_device(v) {
                         Some(name) => {
-                            let mut db = always_lock(driver.values.lock());
                             let exists = if let Some(_) = db.get(&v) {
                                 warn!("duplicate match found for {}", name);
                                 true
                             } else {
                                 false
                             };
-                            if !exists {
-                                db.insert(v, name.clone());
-                                always_lock(driver.catt_values.lock())
-                                    .insert(name.clone(), Item::new(&name, v));
-                            }
-                            name
+                            (name, exists)
                         }
                         None => {
-                            debug!("no configured devices matched {}", v);
-                            continue;
+                            if cfg.expose_unbound {
+                                if let Some(name) = db.get(&v) {
+                                    warn!("duplicate match found for unconfigured {}", name);
+                                    (name.clone(), true)
+                                } else {
+                                    (format!("zwave_{}_{}", v.get_node_id(), v.get_label()), false)
+                                }
+                            } else {
+                                debug!("no configured devices matched {}", v);
+                                continue;
+                            }
                         }
                     };
+                    if !exists {
+                        db.insert(v, name.clone());
+                        always_lock(driver.catt_values.lock())
+                            .insert(name.clone(), Item::new(&name, v));
+                    }
                     Notification::Added(Item::new(&name, v))
                 }
 
                 ZWaveNotification::ValueChanged(v) => {
+                    if !should_expose(v) {
+                        continue;
+                    }
                     let db = always_lock(driver.values.lock());
                     let name = match db.get(&v) {
                         Some(n) => n,
@@ -124,6 +142,9 @@ fn spawn_notification_thread(driver: ZWave,
                 }
 
                 ZWaveNotification::ValueRemoved(v) => {
+                    if !should_expose(v) {
+                        continue;
+                    }
                     let mut db = always_lock(driver.values.lock());
                     let name = match db.get(&v) {
                         Some(n) => n.clone(),
@@ -150,4 +171,24 @@ fn spawn_notification_thread(driver: ZWave,
             }
         }
     });
+}
+
+fn should_expose(v: ValueID) -> bool {
+    match v.get_genre() {
+        ValueGenre::ValueGenre_Basic |
+        ValueGenre::ValueGenre_User => {}
+        _ => return false,
+    }
+
+    match v.get_type() {
+        ValueType::ValueType_Bool |
+        ValueType::ValueType_Byte |
+        ValueType::ValueType_Decimal |
+        ValueType::ValueType_Int |
+        ValueType::ValueType_Short |
+        ValueType::ValueType_String |
+        ValueType::ValueType_Raw => {}
+        _ => return false,
+    }
+    true
 }
