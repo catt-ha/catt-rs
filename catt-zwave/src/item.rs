@@ -1,19 +1,22 @@
 use openzwave_stateful as ozw;
 use openzwave_stateful::ValueType;
+
 use catt_core::item;
 use catt_core::value::Value as CValue;
+
+use std::collections::HashMap;
 
 use super::errors::*;
 
 #[derive(PartialOrd, Ord, Eq, PartialEq, Debug, Clone)]
-pub struct Value {
+pub struct Item {
     name: String,
     ozw_value: ozw::ValueID,
 }
 
-impl Value {
+impl Item {
     pub fn new(name: &str, value: ozw::ValueID) -> Self {
-        Value {
+        Item {
             name: name.into(),
             ozw_value: value,
         }
@@ -26,7 +29,10 @@ impl Value {
             ValueType::ValueType_Short => self.ozw_value.set_short(number as i16),
             ValueType::ValueType_Int => self.ozw_value.set_int(number as i32),
             ValueType::ValueType_Decimal => self.ozw_value.set_float(number as f32),
-            _ => unreachable!(),
+            _ => {
+                return Err(ErrorKind::InvalidType(self.name.clone(), "float", "not a number")
+                    .into())
+            }
         };
         Ok(res?)
     }
@@ -44,7 +50,7 @@ impl Value {
     }
 }
 
-impl item::Item for Value {
+impl item::Item for Item {
     type Error = Error;
 
     fn get_name(&self) -> String {
@@ -74,6 +80,28 @@ impl item::Item for Value {
         Ok(val)
     }
 
+    fn get_meta(&self) -> Option<item::Meta> {
+        let mut ext = HashMap::new();
+        ext.insert("label".into(), self.ozw_value.get_label());
+        ext.insert("node_id".into(),
+                   format!("{}", self.ozw_value.get_node_id()));
+        ext.insert("command_class".into(),
+                   self.ozw_value
+                       .get_command_class()
+                       .map(|cc| format!("{:?}", cc))
+                       .unwrap_or("???".into()));
+
+        Some(item::Meta {
+            backend: String::from("zwave").into(),
+            value_type: match self.get_value() {
+                    Ok(v) => String::from(v.type_string()),
+                    Err(_) => return None,
+                }
+                .into(),
+            ext: ext.into(),
+        })
+    }
+
     fn set_value(&self, value: CValue) -> Result<()> {
         let val_type = self.ozw_value.get_type();
         let res = match val_type {
@@ -85,7 +113,7 @@ impl item::Item for Value {
                 return Err(ErrorKind::Unimplemented(self.get_name(), val_type).into())
             }
 
-            ValueType::ValueType_Bool |
+            ValueType::ValueType_Bool => self.set_bool(value.as_bool()?),
             ValueType::ValueType_Byte |
             ValueType::ValueType_Short |
             ValueType::ValueType_Int |

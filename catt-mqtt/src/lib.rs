@@ -1,4 +1,5 @@
 #![feature(question_mark)]
+#![feature(conservative_impl_trait)]
 
 #[macro_use]
 extern crate error_chain;
@@ -11,6 +12,8 @@ extern crate rumqtt;
 extern crate rustc_serialize;
 
 extern crate catt_core;
+
+extern crate toml;
 
 pub mod errors;
 pub mod config;

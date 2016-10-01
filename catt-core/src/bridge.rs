@@ -10,15 +10,18 @@ use binding::Notification;
 use bus::Bus;
 use bus::SubType;
 use bus::Message;
-use bus::MessageType;
 
 use item::Item;
+use item::Meta;
+
+use std::thread::JoinHandle;
 
 pub struct Bridge<B, C> {
     #[allow(dead_code)]
     bus: Arc<Mutex<B>>,
     #[allow(dead_code)]
     binding: Arc<C>,
+    handles: Vec<JoinHandle<()>>,
 }
 
 impl<B, C> Bridge<B, C>
@@ -30,7 +33,7 @@ impl<B, C> Bridge<B, C>
         for (name, _) in values.iter() {
             let res = bus.subscribe(name, SubType::Command);
             match res {
-                Err(e) => warn!("subscribe error: {}", e),
+                Err(e) => warn!("subscribe error: {:?}", e),
                 _ => {}
             }
         }
@@ -41,12 +44,19 @@ impl<B, C> Bridge<B, C>
 
         let devices = Arc::new(Mutex::new(values));
 
-        spawn_bus_to_binding(bus_messages, devices.clone());
-        spawn_binding_to_bus(binding.notifications(), bus.clone());
+        let handles = vec![spawn_bus_to_binding(bus_messages, devices.clone()),
+                           spawn_binding_to_bus(binding.notifications(), bus.clone())];
 
         Bridge {
             bus: bus,
             binding: binding,
+            handles: handles,
+        }
+    }
+
+    pub fn join_all(self) {
+        for h in self.handles {
+            let _ = h.join();
         }
     }
 }
@@ -54,6 +64,7 @@ impl<B, C> Bridge<B, C>
 
 fn spawn_bus_to_binding<V>(msgs: Arc<Mutex<Receiver<Message>>>,
                            values: Arc<Mutex<BTreeMap<String, V>>>)
+                           -> JoinHandle<()>
     where V: Send + 'static + Clone + Item
 {
     ::std::thread::spawn(move || {
@@ -63,26 +74,28 @@ fn spawn_bus_to_binding<V>(msgs: Arc<Mutex<Receiver<Message>>>,
                 Err(_) => break,
             };
 
-            match msg.message_type {
+            let (name, value) = match msg {
                 // only accept commands here
-                MessageType::Update => continue,
-                _ => {}
-            }
+                Message::Command(name, value) => (name, value),
+                _ => continue,
+            };
 
-            let val: V = match ::util::always_lock(values.lock()).get(&msg.item_name) {
+            let val: V = match ::util::always_lock(values.lock()).get(&name) {
                 Some(v) => v.clone(),
                 None => continue,
             };
 
-            match val.set_value(msg.value) {
+            match val.set_value(value) {
                 Ok(_) => {}
-                Err(e) => warn!("error setting value from bus: {}", e),
+                Err(e) => warn!("error setting value from bus: {:?}", e),
             };
         }
-    });
+    })
 }
+
 fn spawn_binding_to_bus<V, B>(notifications: Arc<Mutex<Receiver<Notification<V>>>>,
                               bus: Arc<Mutex<B>>)
+                              -> JoinHandle<()>
     where V: Send + 'static + Clone + Item,
           B: Send + 'static + Bus
 {
@@ -93,8 +106,15 @@ fn spawn_binding_to_bus<V, B>(notifications: Arc<Mutex<Receiver<Notification<V>>
                 Err(_) => break,
             };
 
+            let mut meta: Option<Meta> = None;
+            let mut skip_state = false;
+
             let val = match notification {
-                Notification::Added(v) |
+                Notification::Added(v) => {
+                    meta = v.get_meta();
+                    skip_state = true;
+                    v
+                }
                 Notification::Changed(v) => v,
                 _ => continue,
             };
@@ -107,14 +127,21 @@ fn spawn_binding_to_bus<V, B>(notifications: Arc<Mutex<Receiver<Notification<V>>
                 }
             };
 
-            match ::util::always_lock(bus.lock()).publish(Message {
-                message_type: MessageType::Update,
-                item_name: val.get_name(),
-                value: value,
-            }) {
-                Ok(_) => {}
-                Err(e) => warn!("bus publish error: {:?}", e),
-            };
+            if let Some(meta) = meta {
+                if let Err(e) = ::util::always_lock(bus.lock())
+                    .publish(Message::Meta(val.get_name(), meta)) {
+                    warn!("bus publish error: {:?}", e);
+                }
+            }
+
+            if skip_state {
+                continue;
+            }
+
+            if let Err(e) = ::util::always_lock(bus.lock())
+                .publish(Message::Update(val.get_name(), value)) {
+                warn!("bus publish error: {:?}", e);
+            }
         }
-    });
+    })
 }

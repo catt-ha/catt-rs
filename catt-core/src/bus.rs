@@ -3,24 +3,20 @@ use std::sync::Arc;
 use std::sync::Mutex;
 
 use value::Value;
+use item::Meta;
 
 #[derive(Debug)]
-pub struct Message {
-    pub message_type: MessageType,
-    pub item_name: String,
-    pub value: Value,
-}
-
-#[derive(Debug)]
-pub enum MessageType {
-    Update,
-    Command,
+pub enum Message {
+    Update(String, Value),
+    Command(String, Value),
+    Meta(String, Meta),
 }
 
 #[derive(Debug)]
 pub enum SubType {
     Update,
     Command,
+    Meta,
     All,
 }
 

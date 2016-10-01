@@ -12,5 +12,5 @@ fn main() {
 
     let bridge = init("config.toml").unwrap();
 
-    ::std::thread::sleep(::std::time::Duration::from_secs(600));
+    bridge.join_all();
 }

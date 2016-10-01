@@ -4,7 +4,7 @@ item_base = "catt/items"
 client-id = "catt-zwave"
 
 [zwave]
-port = "/dev/ttyUSB0"
+port = "/dev/ttyACM0"
 expose_unbound = true
 sys_config = "/etc/openzwave-git"
 user_config = "./config"
@@ -15,6 +15,30 @@ name = "controller"
 
 [[zwave.device]]
 id = 2
-name = "Test_Switch"
-zwave_label = "level"
-value_type = "int"
+name = "Test_Switch_0"
+zwave_label = "switch"
+value_type = "bool"
+
+[[zwave.device]]
+id = 5
+name = "Test_Switch_1"
+zwave_label = "switch"
+value_type = "bool"
+
+[[zwave.device]]
+id = 6
+name = "Test_Switch_2"
+zwave_label = "switch"
+value_type = "bool"
+
+[[zwave.device]]
+id = 7
+name = "Test_Switch_3"
+zwave_label = "switch"
+value_type = "bool"
+
+[[zwave.device]]
+id = 9
+name = "Test_Switch_4"
+zwave_label = "switch"
+value_type = "bool"

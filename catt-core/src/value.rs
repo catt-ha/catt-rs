@@ -21,7 +21,7 @@ error_chain!{
     }
 }
 
-#[derive(Debug,PartialEq,Clone)]
+#[derive(Debug,PartialEq,Clone,RustcEncodable,RustcDecodable)]
 pub enum Value {
     Number(f64),
     String(String),
@@ -30,6 +30,14 @@ pub enum Value {
 }
 
 impl Value {
+    pub fn type_string(&self) -> &'static str {
+        match self {
+            &Value::Number(_) => "number",
+            &Value::String(_) => "string",
+            &Value::Raw(_) => "raw",
+            &Value::Bool(_) => "bool",
+        }
+    }
     pub fn from_raw(v: &[u8]) -> Value {
         let value = match String::from_utf8(v.into()) {
             Ok(s) => Value::String(s),

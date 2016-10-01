@@ -6,7 +6,6 @@ use std::sync::mpsc::channel;
 use std::sync::mpsc::Receiver;
 use std::sync::mpsc::Sender;
 
-use catt_core::util::CVar;
 use catt_core::util::always_lock;
 use catt_core::binding::Binding;
 use catt_core::binding::Notification;
@@ -17,12 +16,12 @@ use openzwave_stateful::ZWaveNotification;
 
 use config::ZWaveConfig;
 use super::errors::*;
-use super::value::Value;
+use super::item::Item;
 
 pub struct ZWave {
     #[allow(dead_code)]
     ozw_manager: Arc<ozw::ZWaveManager>,
-    notifications: Arc<Mutex<Receiver<Notification<Value>>>>,
+    notifications: Arc<Mutex<Receiver<Notification<Item>>>>,
     values: Arc<Mutex<BTreeMap<ValueID, (String, u8)>>>,
 }
 
@@ -33,7 +32,7 @@ impl ZWave {
             let sys_config: ozw::ConfigPath = cfg.sys_config
                 .as_ref()
                 .map(|c| ozw::ConfigPath::Custom(&c))
-                .unwrap_or(ozw::ConfigPath::Default);
+                .unwrap_or(ozw::ConfigPath::Custom("/etc/openzwave"));
 
             let user_config: &str =
                 cfg.user_config.as_ref().map(|c| c.as_ref()).unwrap_or("./config");
@@ -46,13 +45,10 @@ impl ZWave {
         };
 
         let value_db = Arc::new(Mutex::new(BTreeMap::new()));
-        let ready = CVar::new();
 
         let (tx, rx) = channel();
 
-        spawn_notification_thread(value_db.clone(), cfg, tx, notifications, ready.clone());
-
-        let _ = ready.wait();
+        spawn_notification_thread(value_db.clone(), cfg, tx, notifications);
 
         Ok(ZWave {
             ozw_manager: manager,
@@ -64,13 +60,13 @@ impl ZWave {
 
 impl Binding for ZWave {
     type Error = Error;
-    type Item = Value;
+    type Item = Item;
 
     fn get_values(&self) -> BTreeMap<String, Self::Item> {
         let values_lock = ::catt_core::util::always_lock(self.values.lock());
 
         values_lock.iter()
-            .map(|(k, v)| (v.0.clone(), Value::new(&v.0, *k)))
+            .map(|(k, v)| (v.0.clone(), Item::new(&v.0, *k)))
             .collect()
     }
 
@@ -81,17 +77,15 @@ impl Binding for ZWave {
 
 fn spawn_notification_thread(db: Arc<Mutex<BTreeMap<ValueID, (String, u8)>>>,
                              cfg: ZWaveConfig,
-                             output: Sender<Notification<Value>>,
-                             rx: Receiver<ZWaveNotification>,
-                             ready: CVar) {
+                             output: Sender<Notification<Item>>,
+                             rx: Receiver<ZWaveNotification>) {
     ::std::thread::spawn(move || {
         for zwave_notification in rx {
-            let notification: Notification<Value> = match zwave_notification {
+            let notification: Notification<Item> = match zwave_notification {
                 ZWaveNotification::AllNodesQueried(_) |
                 ZWaveNotification::AwakeNodesQueried(_) |
                 ZWaveNotification::AllNodesQueriedSomeDead(_) => {
                     debug!("Controller ready");
-                    ready.notify_all();
                     continue;
                 }
 
@@ -114,7 +108,7 @@ fn spawn_notification_thread(db: Arc<Mutex<BTreeMap<ValueID, (String, u8)>>>,
                             continue;
                         }
                     };
-                    Notification::Added(Value::new(&name, v))
+                    Notification::Added(Item::new(&name, v))
                 }
 
                 ZWaveNotification::ValueChanged(v) => {
@@ -124,7 +118,7 @@ fn spawn_notification_thread(db: Arc<Mutex<BTreeMap<ValueID, (String, u8)>>>,
                         None => continue,
                     };
                     debug!("value {} changed: {}", name, v);
-                    Notification::Changed(Value::new(&name, v))
+                    Notification::Changed(Item::new(&name, v))
                 }
 
                 ZWaveNotification::ValueRemoved(v) => {
@@ -135,7 +129,7 @@ fn spawn_notification_thread(db: Arc<Mutex<BTreeMap<ValueID, (String, u8)>>>,
                     };
                     debug!("removing value {} from db", name);
                     db.remove(&v);
-                    Notification::Removed(Value::new(&name, v))
+                    Notification::Removed(Item::new(&name, v))
                 }
 
                 _ => {

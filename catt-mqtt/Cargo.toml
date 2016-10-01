@@ -8,6 +8,7 @@ catt-core = { path = "../catt-core" }
 error-chain = "*"
 log = "*"
 rustc-serialize = "*"
+toml = "*"
 rumqtt = { git = "https://github.com/Ather-Energy/RuMqtt.git" }
 
 [dev-dependencies]

@@ -21,6 +21,10 @@ error_chain! {
             description("unimplemented zwave value type")
             display("unimplemented zwave value type for item {}: {:?}", item_name, value_type)
         }
+        InvalidType(item_name: String, provided: &'static str, actual: &'static str) {
+            description("invalid provided value type")
+            display("invalid type provided for {}: {}. actual type is {}.", item_name, provided, actual)
+        }
     }
 }
 
