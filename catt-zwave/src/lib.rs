@@ -19,3 +19,5 @@ pub mod driver;
 pub mod errors;
 pub mod class;
 pub mod item;
+pub mod zwave_item;
+pub mod controller;

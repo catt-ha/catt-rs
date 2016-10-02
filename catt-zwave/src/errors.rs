@@ -25,6 +25,14 @@ error_chain! {
             description("invalid provided value type")
             display("invalid type provided for {}: {}. actual type is {}.", item_name, provided, actual)
         }
+        NoValue(item_name: String) {
+            description("item has no value")
+            display("item has no value: {}", item_name)
+        }
+        InvalidCommand(command: String) {
+            description("invalid command sent to controller")
+            display("invalid controller command: {}", command)
+        }
     }
 }
 

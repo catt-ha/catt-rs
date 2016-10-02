@@ -9,6 +9,7 @@ use std::sync::mpsc::Sender;
 use catt_core::util::always_lock;
 use catt_core::binding::Binding;
 use catt_core::binding::Notification;
+use catt_core::value::Value;
 use catt_core::item::Item as CItem;
 
 use openzwave_stateful as ozw;
@@ -61,9 +62,19 @@ impl ZWave {
             catt_values: Default::default(),
         };
 
+        let controller = Item::controller("ZWave_Controller", driver.clone());
+        tx.send(Notification::Added(controller.clone())).unwrap();
+        tx.send(Notification::Changed(controller.clone())).unwrap();
+        always_lock(driver.catt_values.lock()).insert("ZWave_Controller".into(), controller);
+
+
         spawn_notification_thread(driver.clone(), cfg, tx, notifications);
 
         Ok(driver)
+    }
+
+    pub fn get_manager(&self) -> Arc<ozw::ZWaveManager> {
+        self.ozw_manager.clone()
     }
 }
 
@@ -124,7 +135,7 @@ fn spawn_notification_thread(driver: ZWave,
                             }
                         }
                     };
-                    let item = Item::new(&name, v);
+                    let item = Item::item(&name, v);
                     if !exists {
                         debug!("adding value {} to db", name);
                         db.insert(v, name.clone());
@@ -142,7 +153,7 @@ fn spawn_notification_thread(driver: ZWave,
                         Some(n) => n,
                         None => continue,
                     };
-                    let item = Item::new(&name, v);
+                    let item = Item::item(&name, v);
                     debug!("value {} changed: {:?}", item.get_name(), item.get_value());
                     Notification::Changed(item)
                 }
@@ -159,7 +170,53 @@ fn spawn_notification_thread(driver: ZWave,
                     debug!("removing value {} from db", name);
                     db.remove(&v);
                     always_lock(driver.catt_values.lock()).remove(&name);
-                    Notification::Removed(Item::new(&name, v))
+                    Notification::Removed(Item::item(&name, v))
+                }
+
+                ZWaveNotification::Generic(s) => {
+                    if s.contains("Type_DriverRemoved") {
+                        warn!("controller removed! shutting down.");
+                        ::std::process::exit(1);
+                    }
+                    continue;
+                }
+
+                ZWaveNotification::StateStarting(_) => {
+                    let db = always_lock(driver.catt_values.lock());
+                    match db.get("ZWave_Controller") {
+                        Some(controller) => Notification::Changed(controller.clone()),
+                        None => {
+                            debug!("controller not found in item db");
+                            continue;
+                        }
+                    }
+                }
+                ZWaveNotification::StateCompleted(_) => {
+                    let db = always_lock(driver.catt_values.lock());
+                    match db.get("ZWave_Controller") {
+                        Some(controller) => {
+                            let _ = controller.set_value(Value::String("idle".into()));
+                            Notification::Changed(controller.clone())
+                        }
+                        None => {
+                            debug!("controller not found in item db");
+                            continue;
+                        }
+                    }
+                }
+
+                ZWaveNotification::StateFailed(_) => {
+                    let db = always_lock(driver.catt_values.lock());
+                    match db.get("ZWave_Controller") {
+                        Some(controller) => {
+                            let _ = controller.set_value(Value::String("failed".into()));
+                            Notification::Changed(controller.clone())
+                        }
+                        None => {
+                            debug!("controller not found in item db");
+                            continue;
+                        }
+                    }
                 }
 
                 _ => {
