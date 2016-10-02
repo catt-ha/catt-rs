@@ -124,14 +124,6 @@ fn spawn_binding_to_bus<V, B>(notifications: Arc<Mutex<Receiver<Notification<V>>
                 }
             };
 
-            let value = match val.get_value() {
-                Ok(v) => v,
-                Err(e) => {
-                    warn!("error getting item value: {:?}", e);
-                    continue;
-                }
-            };
-
             if let Some(meta) = meta {
                 if let Err(e) = ::util::always_lock(bus.lock())
                     .publish(Message::Meta(val.get_name(), meta)) {
@@ -156,6 +148,14 @@ fn spawn_binding_to_bus<V, B>(notifications: Arc<Mutex<Receiver<Notification<V>>
             if skip_state {
                 continue;
             }
+
+            let value = match val.get_value() {
+                Ok(v) => v,
+                Err(e) => {
+                    warn!("error getting item value: {:?}", e);
+                    continue;
+                }
+            };
 
             if let Err(e) = ::util::always_lock(bus.lock())
                 .publish(Message::Update(val.get_name(), value)) {

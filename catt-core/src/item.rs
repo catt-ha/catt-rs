@@ -14,7 +14,9 @@ pub trait Item {
 
     fn get_name(&self) -> String;
 
-    fn get_meta(&self) -> Option<Meta>;
+    fn get_meta(&self) -> Option<Meta> {
+        None
+    }
 
     fn get_value(&self) -> Result<Value, Self::Error>;
     fn set_value(&self, Value) -> Result<(), Self::Error>;

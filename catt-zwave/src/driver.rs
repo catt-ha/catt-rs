@@ -19,8 +19,8 @@ use openzwave_stateful::ZWaveNotification;
 
 use config::ZWaveConfig;
 
-use super::errors::*;
-use super::item::Item;
+use errors::*;
+use item::Item;
 
 #[derive(Clone)]
 pub struct ZWave {
