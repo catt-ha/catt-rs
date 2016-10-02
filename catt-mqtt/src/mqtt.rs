@@ -82,6 +82,7 @@ impl MqttClient {
             None => format!("{}/{}", MQTT_BASE_DEFAULT, path),
         };
 
+        debug!("publish to {}: {:?}", path, state);
         match self.requester {
             Some(ref req) => Ok(req.publish(&pub_path, rumqtt::QoS::Level0, state.into())?),
             None => Err(ErrorKind::NotStarted.into()),
@@ -94,6 +95,7 @@ impl MqttClient {
             None => format!("{}/{}", MQTT_BASE_DEFAULT, path),
         };
 
+        debug!("subscribe to {}", path);
         match self.requester {
             Some(ref req) => Ok(req.subscribe(vec![(&sub_path, rumqtt::QoS::Level0)])?),
             None => Err(ErrorKind::NotStarted.into()),
@@ -112,6 +114,7 @@ impl MqttClient {
         //     Some(ref req) => Ok(req.unsubscribe(vec![(&sub_path, rumqtt::QoS::Level0)])?),
         //     None => Err(ErrorKind::NotStarted.into()),
         // }
+        debug!("unsubscribe from {}", path);
         Ok(())
     }
 }
@@ -139,6 +142,7 @@ impl Mqtt {
 
 fn message_callback(tx: Mutex<Sender<Message>>) -> impl Fn(rumqtt::Message) {
     return move |message| {
+        debug!("got message: {:?}", message);
         let topic = message.topic.as_str().split("/").collect::<Vec<&str>>();
 
         if topic.len() < 2 {

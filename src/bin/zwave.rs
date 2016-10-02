@@ -8,7 +8,7 @@ use catt::init;
 
 #[allow(unused_variables)]
 fn main() {
-    let _ = LogBuilder::new().parse("catt_core=debug,catt_zwave=debug,catt_mqtt=debug").init();
+    env_logger::init().unwrap();
 
     let bridge = init("config.toml").unwrap();
 

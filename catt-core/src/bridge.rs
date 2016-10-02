@@ -64,20 +64,28 @@ fn spawn_bus_to_binding<V>(msgs: Arc<Mutex<Receiver<Message>>>,
                 Err(_) => break,
             };
 
+            debug!("got message: {:?}", msg);
+
             let (name, value) = match msg {
                 // only accept commands here
-                Message::Command(name, value) => (name, value),
-                _ => continue,
+                Message::Command(ref name, ref value) => (name, value),
+                _ => {
+                    debug!("not a command, dropping message");
+                    continue;
+                }
             };
 
-            let val: V = match ::util::always_lock(values.lock()).get(&name) {
+            let val: V = match ::util::always_lock(values.lock()).get(name) {
                 Some(v) => v.clone(),
-                None => continue,
+                None => {
+                    debug!("could not find item for command");
+                    continue;
+                }
             };
 
-            match val.set_value(value) {
+            match val.set_value(value.clone()) {
                 Ok(_) => {}
-                Err(e) => warn!("error setting value from bus: {:?}", e),
+                Err(e) => warn!("error setting value from {:?}: {:?}", msg, e),
             };
         }
     })

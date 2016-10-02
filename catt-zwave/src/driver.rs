@@ -126,6 +126,7 @@ fn spawn_notification_thread(driver: ZWave,
                     };
                     let item = Item::new(&name, v);
                     if !exists {
+                        debug!("adding value {} to db", name);
                         db.insert(v, name.clone());
                         always_lock(driver.catt_values.lock()).insert(name.clone(), item.clone());
                     }
@@ -162,7 +163,7 @@ fn spawn_notification_thread(driver: ZWave,
                 }
 
                 _ => {
-                    // debug!("unmatched notification: {}", n);
+                    debug!("unmatched notification: {}", zwave_notification);
                     continue;
                 }
             };
