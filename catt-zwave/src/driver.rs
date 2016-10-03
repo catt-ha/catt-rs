@@ -62,12 +62,6 @@ impl ZWave {
             catt_values: Default::default(),
         };
 
-        let controller = Item::controller("ZWave_Controller", driver.clone());
-        tx.send(Notification::Added(controller.clone())).unwrap();
-        tx.send(Notification::Changed(controller.clone())).unwrap();
-        always_lock(driver.catt_values.lock()).insert("ZWave_Controller".into(), controller);
-
-
         spawn_notification_thread(driver.clone(), cfg, tx, notifications);
 
         Ok(driver)
@@ -98,6 +92,16 @@ fn spawn_notification_thread(driver: ZWave,
     ::std::thread::spawn(move || {
         for zwave_notification in rx {
             let notification: Notification<Item> = match zwave_notification {
+                ZWaveNotification::ControllerReady(c) => {
+                    let home_id = c.get_home_id();
+                    let controller = Item::controller(&format!("zwave_{}_Controller", home_id),
+                                                      driver.clone(),
+                                                      home_id);
+                    always_lock(driver.catt_values.lock())
+                        .insert(controller.get_name(), controller.clone());
+                    output.send(Notification::Added(controller.clone())).unwrap();
+                    Notification::Changed(controller)
+                }
                 ZWaveNotification::AllNodesQueried(_) |
                 ZWaveNotification::AwakeNodesQueried(_) |
                 ZWaveNotification::AllNodesQueriedSomeDead(_) => {
@@ -127,7 +131,11 @@ fn spawn_notification_thread(driver: ZWave,
                                     warn!("duplicate match found for unconfigured {}", name);
                                     (name.clone(), true)
                                 } else {
-                                    (format!("zwave_{}_{}", v.get_node_id(), v.get_label()), false)
+                                    (format!("zwave_{}_{}_{}",
+                                             v.get_home_id(),
+                                             v.get_node_id(),
+                                             v.get_label()),
+                                     false)
                                 }
                             } else {
                                 debug!("no configured devices matched {}", v);
@@ -181,9 +189,10 @@ fn spawn_notification_thread(driver: ZWave,
                     continue;
                 }
 
-                ZWaveNotification::StateStarting(_) => {
+                ZWaveNotification::StateStarting(c) => {
+                    let db_name = format!("zwave_{}_Controller", c.get_home_id());
                     let db = always_lock(driver.catt_values.lock());
-                    match db.get("ZWave_Controller") {
+                    match db.get(&db_name) {
                         Some(controller) => Notification::Changed(controller.clone()),
                         None => {
                             debug!("controller not found in item db");
@@ -191,9 +200,10 @@ fn spawn_notification_thread(driver: ZWave,
                         }
                     }
                 }
-                ZWaveNotification::StateCompleted(_) => {
+                ZWaveNotification::StateCompleted(c) => {
+                    let db_name = format!("zwave_{}_Controller", c.get_home_id());
                     let db = always_lock(driver.catt_values.lock());
-                    match db.get("ZWave_Controller") {
+                    match db.get(&db_name) {
                         Some(controller) => {
                             let _ = controller.set_value(Value::String("idle".into()));
                             Notification::Changed(controller.clone())
@@ -205,9 +215,10 @@ fn spawn_notification_thread(driver: ZWave,
                     }
                 }
 
-                ZWaveNotification::StateFailed(_) => {
+                ZWaveNotification::StateFailed(c) => {
+                    let db_name = format!("zwave_{}_Controller", c.get_home_id());
                     let db = always_lock(driver.catt_values.lock());
-                    match db.get("ZWave_Controller") {
+                    match db.get(&db_name) {
                         Some(controller) => {
                             let _ = controller.set_value(Value::String("failed".into()));
                             Notification::Changed(controller.clone())

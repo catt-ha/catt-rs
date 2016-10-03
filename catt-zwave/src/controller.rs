@@ -14,14 +14,16 @@ use driver::ZWave;
 pub struct ControllerItem {
     name: String,
     driver: ZWave,
+    home_id: u32,
     state: Arc<Mutex<String>>,
 }
 
 impl ControllerItem {
-    pub fn new<S: Into<String>>(name: S, driver: ZWave) -> Self {
+    pub fn new<S: Into<String>>(name: S, driver: ZWave, home_id: u32) -> Self {
         ControllerItem {
             name: name.into(),
             driver: driver,
+            home_id: home_id,
             state: Arc::new(Mutex::new("idle".into())),
         }
     }

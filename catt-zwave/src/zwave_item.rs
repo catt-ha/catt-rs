@@ -86,6 +86,8 @@ impl item::Item for ZWaveItem {
         ext.insert("label".into(), self.ozw_value.get_label());
         ext.insert("node_id".into(),
                    format!("{}", self.ozw_value.get_node_id()));
+        ext.insert("home_id".into(),
+                   format!("{}", self.ozw_value.get_home_id()));
         ext.insert("command_class".into(),
                    self.ozw_value
                        .get_command_class()
@@ -100,6 +102,7 @@ impl item::Item for ZWaveItem {
                 }
                 .into(),
             ext: ext.into(),
+            ..Default::default()
         })
     }
 

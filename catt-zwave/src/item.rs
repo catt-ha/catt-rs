@@ -16,8 +16,8 @@ pub struct Item {
 }
 
 impl Item {
-    pub fn controller(name: &str, value: ZWave) -> Self {
-        Item { controller: ControllerItem::new(name, value).into(), ..Default::default() }
+    pub fn controller(name: &str, value: ZWave, home_id: u32) -> Self {
+        Item { controller: ControllerItem::new(name, value, home_id).into(), ..Default::default() }
     }
 
     pub fn item(name: &str, value: ozw::ValueID) -> Self {

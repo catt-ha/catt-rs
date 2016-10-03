@@ -2,8 +2,6 @@ extern crate catt;
 
 extern crate env_logger;
 
-use env_logger::LogBuilder;
-
 use catt::init;
 
 #[allow(unused_variables)]
