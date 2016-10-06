@@ -1,5 +1,4 @@
 use std::string::FromUtf8Error;
-use openzwave_stateful as ozw_s;
 use openzwave as ozw;
 use catt_core::value;
 
@@ -9,15 +8,16 @@ error_chain! {
     }
 
     foreign_links {
-        ozw_s::Error, ZWave;
+        ::std::io::Error, IoError;
         FromUtf8Error, Utf8;
         ::std::str::ParseBoolError, ParseBool;
         ::std::num::ParseIntError, ParseInt;
         ::std::num::ParseFloatError, ParseFloat;
+        ozw::Error, ZWave;
     }
 
     errors {
-        Unimplemented(item_name: String, value_type: ozw_s::ValueType) {
+        Unimplemented(item_name: String, value_type: ozw::value_classes::value_id::ValueType) {
             description("unimplemented zwave value type")
             display("unimplemented zwave value type for item {}: {:?}", item_name, value_type)
         }
@@ -33,11 +33,5 @@ error_chain! {
             description("invalid command sent to controller")
             display("invalid controller command: {}", command)
         }
-    }
-}
-
-impl From<ozw::Error> for Error {
-    fn from(other: ozw::Error) -> Self {
-        ozw_s::Error::from(other).into()
     }
 }

@@ -55,21 +55,14 @@ impl Item for ControllerItem {
 
     fn set_value(&self, val: Value) -> Result<()> {
         let manager = self.driver.get_manager();
-        let home_id = {
-            let state = manager.get_state();
-            let mut home_ids: Vec<u32> =
-                state.get_controllers().keys().map(|c| c.get_home_id()).collect();
-            home_ids.sort();
-            home_ids[0]
-        };
 
         let cmd = val.as_string()?.trim().to_lowercase();
         match cmd.as_str() {
             "include" => {
-                manager.add_node(home_id, false)?;
+                manager.add_node(self.home_id, false)?;
             }
             "exclude" => {
-                manager.remove_node(home_id)?;
+                manager.remove_node(self.home_id)?;
             }
             _ => {}
         }

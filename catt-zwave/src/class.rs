@@ -1,5 +1,5 @@
-pub use openzwave_stateful::CommandClass as ZClass;
-pub use openzwave_stateful::ValueType as ZType;
+pub use openzwave::value_classes::value_id::CommandClass as ZClass;
+pub use openzwave::value_classes::value_id::ValueType as ZType;
 
 pub struct CommandClass(ZClass);
 use std::ops::Deref;

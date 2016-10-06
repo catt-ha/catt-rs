@@ -1,5 +1,4 @@
-use openzwave_stateful as ozw;
-use openzwave_stateful::ValueType;
+use openzwave::value_classes::value_id::{ValueType, ValueID};
 
 use catt_core::item;
 use catt_core::value::Value as CValue;
@@ -11,11 +10,11 @@ use super::errors::*;
 #[derive(PartialOrd, Ord, Eq, PartialEq, Debug, Clone)]
 pub struct ZWaveItem {
     name: String,
-    ozw_value: ozw::ValueID,
+    ozw_value: ValueID,
 }
 
 impl ZWaveItem {
-    pub fn new(name: &str, value: ozw::ValueID) -> Self {
+    pub fn new(name: &str, value: ValueID) -> Self {
         ZWaveItem {
             name: name.into(),
             ozw_value: value,
@@ -93,6 +92,9 @@ impl item::Item for ZWaveItem {
                        .get_command_class()
                        .map(|cc| format!("{:?}", cc))
                        .unwrap_or("???".into()));
+        ext.insert("help".into(), self.ozw_value.get_help());
+        ext.insert("units".into(), self.ozw_value.get_units());
+        ext.insert("genre".into(), format!("{:?}", self.ozw_value.get_genre()));
 
         Some(item::Meta {
             backend: String::from("zwave").into(),

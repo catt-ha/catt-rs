@@ -1,4 +1,4 @@
-use openzwave_stateful as ozw;
+use openzwave::value_classes::value_id::ValueID;
 
 use catt_core::item;
 use catt_core::value::Value as CValue;
@@ -20,7 +20,7 @@ impl Item {
         Item { controller: ControllerItem::new(name, value, home_id).into(), ..Default::default() }
     }
 
-    pub fn item(name: &str, value: ozw::ValueID) -> Self {
+    pub fn item(name: &str, value: ValueID) -> Self {
         Item { zwave_item: ZWaveItem::new(name, value).into(), ..Default::default() }
     }
 }

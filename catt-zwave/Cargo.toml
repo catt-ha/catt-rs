@@ -4,8 +4,8 @@ version = "0.1.0"
 authors = ["Josh Chase <jcjoshuachase@gmail.com>"]
 
 [dependencies]
+serial_ports = { git = "https://github.com/dhylands/serial-ports-rs" }
 openzwave = { git = "https://github.com/fxbox/openzwave-rust" }
-openzwave-stateful = { git = "https://github.com/fxbox/openzwave-stateful-rust" }
 catt-core = { path = "../catt-core" }
 log = "*"
 error-chain = "*"

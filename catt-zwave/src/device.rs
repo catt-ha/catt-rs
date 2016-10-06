@@ -1,4 +1,4 @@
-use openzwave_stateful::ValueID;
+use openzwave::value_classes::value_id::ValueID;
 
 use std::collections::BTreeMap;
 

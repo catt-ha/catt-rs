@@ -83,7 +83,6 @@ impl MqttClient {
             None => format!("{}/{}", MQTT_BASE_DEFAULT, path),
         };
 
-        debug!("publish to {}: {:?}", path, state);
         match self.requester {
             Some(ref req) => Ok(req.publish(&pub_path, rumqtt::QoS::Level0, state.into())?),
             None => Err(ErrorKind::NotStarted.into()),
@@ -96,7 +95,6 @@ impl MqttClient {
             None => format!("{}/{}", MQTT_BASE_DEFAULT, path),
         };
 
-        debug!("subscribe to {}", path);
         match self.requester {
             Some(ref req) => Ok(req.subscribe(vec![(&sub_path, rumqtt::QoS::Level0)])?),
             None => Err(ErrorKind::NotStarted.into()),
@@ -115,7 +113,6 @@ impl MqttClient {
         //     Some(ref req) => Ok(req.unsubscribe(vec![(&sub_path, rumqtt::QoS::Level0)])?),
         //     None => Err(ErrorKind::NotStarted.into()),
         // }
-        debug!("unsubscribe from {}", path);
         Ok(())
     }
 }
@@ -196,6 +193,7 @@ impl Bus for Mqtt {
     }
 
     fn publish(&self, message: Message) -> Result<()> {
+        debug!("publish {:?}", message);
         let (name, message_type, payload) = match message {
             Message::Update(name, value) => (name, "state", value.as_string()?),
             Message::Command(name, value) => (name, "command", value.as_string()?),
@@ -206,6 +204,7 @@ impl Bus for Mqtt {
     }
 
     fn subscribe(&self, item_name: &str, sub_type: SubType) -> Result<()> {
+        debug!("subscribe {}, {:?}", item_name, sub_type);
         match sub_type {
             SubType::Update => self.get_client().subscribe(&format!("{}/state", item_name)),
             SubType::Command => self.get_client().subscribe(&format!("{}/command", item_name)),
@@ -215,6 +214,7 @@ impl Bus for Mqtt {
     }
 
     fn unsubscribe(&self, item_name: &str, sub_type: SubType) -> Result<()> {
+        debug!("unsubscribe {}, {:?}", item_name, sub_type);
         match sub_type {
             SubType::Update => self.get_client().unsubscribe(&format!("{}/state", item_name)),
             SubType::Command => self.get_client().unsubscribe(&format!("{}/command", item_name)),

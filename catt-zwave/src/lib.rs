@@ -7,7 +7,7 @@ extern crate log;
 extern crate error_chain;
 
 extern crate openzwave;
-extern crate openzwave_stateful;
+extern crate serial_ports;
 
 extern crate catt_core;
 

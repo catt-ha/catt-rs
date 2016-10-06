@@ -1,6 +1,6 @@
-use openzwave_stateful::ValueID;
-use openzwave_stateful::ValueType;
-use openzwave_stateful::ValueGenre;
+use openzwave::value_classes::value_id::ValueID;
+use openzwave::value_classes::value_id::ValueType;
+use openzwave::value_classes::value_id::ValueGenre;
 
 #[derive(RustcDecodable,Debug,Clone,Default)]
 pub struct Config {
