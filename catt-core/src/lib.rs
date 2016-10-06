@@ -11,6 +11,8 @@ extern crate rustc_serialize;
 
 extern crate byteorder;
 
+extern crate toml;
+
 pub mod util;
 pub mod bus;
 pub mod value;

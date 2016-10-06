@@ -1,6 +1,4 @@
 use std::sync::mpsc::Receiver;
-use std::sync::Arc;
-use std::sync::Mutex;
 
 use value::Value;
 use item::Meta;
@@ -21,11 +19,13 @@ pub enum SubType {
 }
 
 pub trait Bus {
-    type Error: ::std::error::Error;
+    type Config;
+    type Error: ::std::error::Error + Send + 'static;
+
+    fn new(&Self::Config) -> Result<(Self, Receiver<Message>), Self::Error>
+        where Self: ::std::marker::Sized;
 
     fn publish(&self, Message) -> Result<(), Self::Error>;
     fn subscribe(&self, item_name: &str, SubType) -> Result<(), Self::Error>;
     fn unsubscribe(&self, item_name: &str, SubType) -> Result<(), Self::Error>;
-
-    fn messages(&self) -> Arc<Mutex<Receiver<Message>>>;
 }

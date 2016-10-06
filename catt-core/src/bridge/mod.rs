@@ -7,6 +7,9 @@ use std::sync::mpsc::Receiver;
 
 use binding::Notification;
 
+pub mod config;
+pub use self::config::Config;
+
 use bus::Bus;
 use bus::SubType;
 use bus::Message;
@@ -15,6 +18,20 @@ use item::Item;
 use item::Meta;
 
 use std::thread::JoinHandle;
+use std::error::Error as SError;
+
+error_chain! {
+    errors {
+        Bus(e: Box<SError + Send + 'static>) {
+            display("bus error: {}", e)
+            description("bus error")
+        }
+        Binding(e: Box<SError + Send + 'static>) {
+            display("binding error: {}", e)
+                description("binding error")
+        }
+    }
+}
 
 pub struct Bridge<B, C> {
     #[allow(dead_code)]
@@ -28,20 +45,29 @@ impl<B, C> Bridge<B, C>
     where B: ::bus::Bus + Send + 'static,
           C: ::binding::Binding
 {
-    pub fn new(bus: B, binding: C) -> Self {
+    pub fn new(cfg: Config<B::Config, C::Config>) -> Result<Self> {
+
+        let (bus, messages) = match B::new(&cfg.bus) {
+            Ok(b) => b,
+            Err(e) => return Err(ErrorKind::Bus(Box::new(e)).into()),
+        };
+        let (binding, notifications) = match C::new(&cfg.binding) {
+            Ok(b) => b,
+            Err(e) => return Err(ErrorKind::Binding(Box::new(e)).into()),
+        };
+
         let devices = binding.get_values();
-        let bus_messages = bus.messages();
         let bus = Arc::new(Mutex::new(bus));
         let binding = Arc::new(binding);
 
-        let handles = vec![spawn_bus_to_binding(bus_messages, devices.clone()),
-                           spawn_binding_to_bus(binding.notifications(), bus.clone())];
+        let handles = vec![spawn_bus_to_binding(messages, devices.clone()),
+                           spawn_binding_to_bus(notifications, bus.clone())];
 
-        Bridge {
+        Ok(Bridge {
             bus: bus,
             binding: binding,
             handles: handles,
-        }
+        })
     }
 
     pub fn join_all(self) {
@@ -52,18 +78,13 @@ impl<B, C> Bridge<B, C>
 }
 
 
-fn spawn_bus_to_binding<V>(msgs: Arc<Mutex<Receiver<Message>>>,
+fn spawn_bus_to_binding<V>(msgs: Receiver<Message>,
                            values: Arc<Mutex<BTreeMap<String, V>>>)
                            -> JoinHandle<()>
     where V: Send + 'static + Clone + Item
 {
     ::std::thread::spawn(move || {
-        loop {
-            let msg = match ::util::always_lock(msgs.lock()).recv() {
-                Ok(m) => m,
-                Err(_) => break,
-            };
-
+        for msg in msgs {
             debug!("got message: {:?}", msg);
 
             let (name, value) = match msg {
@@ -91,19 +112,14 @@ fn spawn_bus_to_binding<V>(msgs: Arc<Mutex<Receiver<Message>>>,
     })
 }
 
-fn spawn_binding_to_bus<V, B>(notifications: Arc<Mutex<Receiver<Notification<V>>>>,
+fn spawn_binding_to_bus<V, B>(notifications: Receiver<Notification<V>>,
                               bus: Arc<Mutex<B>>)
                               -> JoinHandle<()>
     where V: Send + 'static + Clone + Item,
           B: Send + 'static + Bus
 {
     ::std::thread::spawn(move || {
-        loop {
-            let notification = match ::util::always_lock(notifications.lock()).recv() {
-                Ok(n) => n,
-                Err(_) => break,
-            };
-
+        for notification in notifications {
             let mut meta: Option<Meta> = None;
             let mut skip_state = false;
             let mut new_sub = false;

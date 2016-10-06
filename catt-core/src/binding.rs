@@ -13,9 +13,12 @@ pub enum Notification<T> {
 }
 
 pub trait Binding {
-    type Error: ::std::error::Error;
+    type Config;
+    type Error: ::std::error::Error + Send + 'static;
     type Item: Item + Send + 'static + Clone;
 
+    fn new(&Self::Config) -> Result<(Self, Receiver<Notification<Self::Item>>), Self::Error>
+        where Self: ::std::marker::Sized;
+
     fn get_values(&self) -> Arc<Mutex<BTreeMap<String, Self::Item>>>;
-    fn notifications(&self) -> Arc<Mutex<Receiver<Notification<Self::Item>>>>;
 }

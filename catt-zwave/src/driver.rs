@@ -27,7 +27,6 @@ use item::Item;
 pub struct ZWave {
     #[allow(dead_code)]
     ozw_manager: Arc<ozw::ZWaveManager>,
-    notifications: Arc<Mutex<Receiver<Notification<Item>>>>,
     // TODO improve this system - ideally, we should hide these behind another struct
     // so that only one call is needed to update both.
     values: Arc<Mutex<BTreeMap<ValueID, String>>>,
@@ -35,7 +34,7 @@ pub struct ZWave {
 }
 
 impl ZWave {
-    pub fn new(cfg: &ZWaveConfig) -> Result<ZWave> {
+    pub fn new(cfg: &ZWaveConfig) -> Result<(ZWave, Receiver<Notification<Item>>)> {
         let cfg = cfg.clone();
         let (manager, notifications) = {
             let sys_config: ozw::ConfigPath = cfg.sys_config
@@ -57,14 +56,13 @@ impl ZWave {
 
         let driver = ZWave {
             ozw_manager: manager,
-            notifications: Arc::new(Mutex::new(rx)),
             values: Default::default(),
             catt_values: Default::default(),
         };
 
         spawn_notification_thread(driver.clone(), cfg, tx, notifications);
 
-        Ok(driver)
+        Ok((driver, rx))
     }
 
     pub fn get_manager(&self) -> Arc<ozw::ZWaveManager> {
@@ -73,15 +71,16 @@ impl ZWave {
 }
 
 impl Binding for ZWave {
+    type Config = ZWaveConfig;
     type Error = Error;
     type Item = Item;
 
-    fn get_values(&self) -> Arc<Mutex<BTreeMap<String, Self::Item>>> {
-        self.catt_values.clone()
+    fn new(cfg: &Self::Config) -> Result<(Self, Receiver<Notification<Item>>)> {
+        ZWave::new(cfg)
     }
 
-    fn notifications(&self) -> Arc<Mutex<Receiver<Notification<Self::Item>>>> {
-        self.notifications.clone()
+    fn get_values(&self) -> Arc<Mutex<BTreeMap<String, Self::Item>>> {
+        self.catt_values.clone()
     }
 }
 

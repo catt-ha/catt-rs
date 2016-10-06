@@ -5,7 +5,6 @@ use toml;
 use config::Config;
 use config::MQTT_BASE_DEFAULT;
 
-use std::sync::Arc;
 use std::sync::Mutex;
 
 use std::sync::mpsc::channel;
@@ -121,11 +120,10 @@ impl MqttClient {
 
 pub struct Mqtt {
     client: MqttClient,
-    messages: Arc<Mutex<Receiver<Message>>>,
 }
 
 impl Mqtt {
-    pub fn with_config(cfg: &Config) -> Result<Self> {
+    pub fn with_config(cfg: &Config) -> Result<(Self, Receiver<Message>)> {
         let (tx, rx) = channel();
         let tx = Mutex::new(tx);
 
@@ -133,10 +131,9 @@ impl Mqtt {
             .with_callback(message_callback(tx))
             .start()?;
 
-        Ok(Mqtt {
+        Ok((Mqtt {
             client: client,
-            messages: Arc::new(Mutex::new(rx)),
-        })
+        }, rx))
     }
 }
 
@@ -184,7 +181,12 @@ fn message_callback(tx: Mutex<Sender<Message>>) -> impl Fn(rumqtt::Message) {
 }
 
 impl Bus for Mqtt {
+    type Config = Config;
     type Error = Error;
+
+    fn new(cfg: &Self::Config) -> Result<(Self, Receiver<Message>)> {
+        Mqtt::with_config(cfg)
+    }
 
     fn publish(&self, message: Message) -> Result<()> {
         let (name, message_type, payload) = match message {
@@ -212,9 +214,5 @@ impl Bus for Mqtt {
             SubType::Meta => self.client.unsubscribe(&format!("{}/meta", item_name)),
             SubType::All => self.client.unsubscribe(&format!("{}/#", item_name)),
         }
-    }
-
-    fn messages(&self) -> Arc<Mutex<Receiver<Message>>> {
-        self.messages.clone()
     }
 }

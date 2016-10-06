@@ -16,6 +16,7 @@ extern crate catt_mqtt;
 extern crate log;
 
 use catt_core::bridge::Bridge;
+use catt_core::bridge::Config;
 use catt_mqtt::mqtt::Mqtt;
 use catt_zwave::driver::ZWave;
 
@@ -28,6 +29,6 @@ mod errors;
 use errors::*;
 
 pub fn init(config_file: &str) -> Result<Bridge<Mqtt, ZWave>> {
-    let cfg = config::Config::from_file(config_file)?;
-    Ok(Bridge::new(Mqtt::with_config(&cfg.mqtt)?, ZWave::new(&cfg.zwave)?))
+    let cfg = Config::from_file(config_file)?;
+    Ok(Bridge::new(cfg)?)
 }
