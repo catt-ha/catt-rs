@@ -1,8 +1,3 @@
-use std::collections::BTreeMap;
-
-use std::sync::Arc;
-use std::sync::Mutex;
-
 use std::sync::mpsc::Receiver;
 
 use binding::Notification;
@@ -35,15 +30,15 @@ error_chain! {
 
 pub struct Bridge<B, C> {
     #[allow(dead_code)]
-    bus: Arc<Mutex<B>>,
+    bus: B,
     #[allow(dead_code)]
-    binding: Arc<C>,
+    binding: C,
     handles: Vec<JoinHandle<()>>,
 }
 
 impl<B, C> Bridge<B, C>
-    where B: ::bus::Bus + Send + 'static,
-          C: ::binding::Binding
+    where B: ::bus::Bus + Clone + Send + 'static,
+          C: ::binding::Binding + Clone + Send + 'static
 {
     pub fn new(cfg: Config<B::Config, C::Config>) -> Result<Self> {
 
@@ -56,11 +51,10 @@ impl<B, C> Bridge<B, C>
             Err(e) => return Err(ErrorKind::Binding(Box::new(e)).into()),
         };
 
-        let devices = binding.get_values();
-        let bus = Arc::new(Mutex::new(bus));
-        let binding = Arc::new(binding);
+        let bus = bus;
+        let binding = binding;
 
-        let handles = vec![spawn_bus_to_binding(messages, devices.clone()),
+        let handles = vec![spawn_bus_to_binding(messages, binding.clone()),
                            spawn_binding_to_bus(notifications, bus.clone())];
 
         Ok(Bridge {
@@ -78,10 +72,8 @@ impl<B, C> Bridge<B, C>
 }
 
 
-fn spawn_bus_to_binding<V>(msgs: Receiver<Message>,
-                           values: Arc<Mutex<BTreeMap<String, V>>>)
-                           -> JoinHandle<()>
-    where V: Send + 'static + Clone + Item
+fn spawn_bus_to_binding<C>(msgs: Receiver<Message>, binding: C) -> JoinHandle<()>
+    where C: ::binding::Binding + Send + 'static
 {
     ::std::thread::spawn(move || {
         for msg in msgs {
@@ -96,7 +88,7 @@ fn spawn_bus_to_binding<V>(msgs: Receiver<Message>,
                 }
             };
 
-            let val: V = match ::util::always_lock(values.lock()).get(name) {
+            let val: C::Item = match binding.get_value(&name) {
                 Some(v) => v.clone(),
                 None => {
                     debug!("could not find item for command");
@@ -112,11 +104,9 @@ fn spawn_bus_to_binding<V>(msgs: Receiver<Message>,
     })
 }
 
-fn spawn_binding_to_bus<V, B>(notifications: Receiver<Notification<V>>,
-                              bus: Arc<Mutex<B>>)
-                              -> JoinHandle<()>
+fn spawn_binding_to_bus<V, B>(notifications: Receiver<Notification<V>>, bus: B) -> JoinHandle<()>
     where V: Send + 'static + Clone + Item,
-          B: Send + 'static + Bus
+          B: Bus + Send + 'static
 {
     ::std::thread::spawn(move || {
         for notification in notifications {
@@ -141,22 +131,19 @@ fn spawn_binding_to_bus<V, B>(notifications: Receiver<Notification<V>>,
             };
 
             if let Some(meta) = meta {
-                if let Err(e) = ::util::always_lock(bus.lock())
-                    .publish(Message::Meta(val.get_name(), meta)) {
+                if let Err(e) = bus.publish(Message::Meta(val.get_name(), meta)) {
                     warn!("bus publish error: {:?}", e);
                 }
             }
 
             if new_sub {
-                if let Err(e) = ::util::always_lock(bus.lock())
-                    .subscribe(&val.get_name(), SubType::Command) {
+                if let Err(e) = bus.subscribe(&val.get_name(), SubType::Command) {
                     warn!("bus subscribe error: {:?}", e);
                 }
             }
 
             if remove_sub {
-                if let Err(e) = ::util::always_lock(bus.lock())
-                    .unsubscribe(&val.get_name(), SubType::Command) {
+                if let Err(e) = bus.unsubscribe(&val.get_name(), SubType::Command) {
                     warn!("bus unsubscribe error: {:?}", e);
                 }
             }
@@ -173,8 +160,7 @@ fn spawn_binding_to_bus<V, B>(notifications: Receiver<Notification<V>>,
                 }
             };
 
-            if let Err(e) = ::util::always_lock(bus.lock())
-                .publish(Message::Update(val.get_name(), value)) {
+            if let Err(e) = bus.publish(Message::Update(val.get_name(), value)) {
                 warn!("bus publish error: {:?}", e);
             }
         }

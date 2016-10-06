@@ -6,6 +6,8 @@ use config::Config;
 use config::MQTT_BASE_DEFAULT;
 
 use std::sync::Mutex;
+use std::sync::MutexGuard;
+use std::sync::Arc;
 
 use std::sync::mpsc::channel;
 use std::sync::mpsc::Receiver;
@@ -118,8 +120,9 @@ impl MqttClient {
     }
 }
 
+#[derive(Clone)]
 pub struct Mqtt {
-    client: MqttClient,
+    client: Arc<Mutex<MqttClient>>,
 }
 
 impl Mqtt {
@@ -132,8 +135,12 @@ impl Mqtt {
             .start()?;
 
         Ok((Mqtt {
-            client: client,
+            client: Arc::new(Mutex::new(client)),
         }, rx))
+    }
+
+    fn get_client(&self) -> MutexGuard<MqttClient> {
+        ::catt_core::util::always_lock(self.client.lock())
     }
 }
 
@@ -195,24 +202,24 @@ impl Bus for Mqtt {
             Message::Meta(name, meta) => (name, "meta", toml::encode_str(&meta)),
         };
         let path = format!("{}/{}", name, message_type);
-        self.client.publish(&path, payload.as_bytes())
+        self.get_client().publish(&path, payload.as_bytes())
     }
 
     fn subscribe(&self, item_name: &str, sub_type: SubType) -> Result<()> {
         match sub_type {
-            SubType::Update => self.client.subscribe(&format!("{}/state", item_name)),
-            SubType::Command => self.client.subscribe(&format!("{}/command", item_name)),
-            SubType::Meta => self.client.subscribe(&format!("{}/meta", item_name)),
-            SubType::All => self.client.subscribe(&format!("{}/#", item_name)),
+            SubType::Update => self.get_client().subscribe(&format!("{}/state", item_name)),
+            SubType::Command => self.get_client().subscribe(&format!("{}/command", item_name)),
+            SubType::Meta => self.get_client().subscribe(&format!("{}/meta", item_name)),
+            SubType::All => self.get_client().subscribe(&format!("{}/#", item_name)),
         }
     }
 
     fn unsubscribe(&self, item_name: &str, sub_type: SubType) -> Result<()> {
         match sub_type {
-            SubType::Update => self.client.unsubscribe(&format!("{}/state", item_name)),
-            SubType::Command => self.client.unsubscribe(&format!("{}/command", item_name)),
-            SubType::Meta => self.client.unsubscribe(&format!("{}/meta", item_name)),
-            SubType::All => self.client.unsubscribe(&format!("{}/#", item_name)),
+            SubType::Update => self.get_client().unsubscribe(&format!("{}/state", item_name)),
+            SubType::Command => self.get_client().unsubscribe(&format!("{}/command", item_name)),
+            SubType::Meta => self.get_client().unsubscribe(&format!("{}/meta", item_name)),
+            SubType::All => self.get_client().unsubscribe(&format!("{}/#", item_name)),
         }
     }
 }

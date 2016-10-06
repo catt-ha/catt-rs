@@ -1,5 +1,3 @@
-use std::collections::BTreeMap;
-
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::mpsc::channel;
@@ -23,14 +21,15 @@ use config::Config;
 use errors::*;
 use item::Item;
 
+use device::DB;
+
 #[derive(Clone)]
 pub struct ZWave {
     #[allow(dead_code)]
     ozw_manager: Arc<ozw::ZWaveManager>,
     // TODO improve this system - ideally, we should hide these behind another struct
     // so that only one call is needed to update both.
-    values: Arc<Mutex<BTreeMap<ValueID, String>>>,
-    catt_values: Arc<Mutex<BTreeMap<String, Item>>>,
+    items: Arc<Mutex<DB>>,
 }
 
 impl ZWave {
@@ -56,8 +55,7 @@ impl ZWave {
 
         let driver = ZWave {
             ozw_manager: manager,
-            values: Default::default(),
-            catt_values: Default::default(),
+            items: Arc::new(Mutex::new(Default::default())),
         };
 
         spawn_notification_thread(driver.clone(), cfg, tx, notifications);
@@ -79,8 +77,8 @@ impl Binding for ZWave {
         ZWave::new(cfg)
     }
 
-    fn get_values(&self) -> Arc<Mutex<BTreeMap<String, Self::Item>>> {
-        self.catt_values.clone()
+    fn get_value(&self, name: &str) -> Option<Item> {
+        always_lock(self.items.lock()).get_item(&String::from(name)).map(|i| i.clone())
     }
 }
 
@@ -96,8 +94,8 @@ fn spawn_notification_thread(driver: ZWave,
                     let controller = Item::controller(&format!("zwave_{}_Controller", home_id),
                                                       driver.clone(),
                                                       home_id);
-                    always_lock(driver.catt_values.lock())
-                        .insert(controller.get_name(), controller.clone());
+                    always_lock(driver.items.lock())
+                        .add_item(controller.get_name(), controller.clone());
                     output.send(Notification::Added(controller.clone())).unwrap();
                     Notification::Changed(controller)
                 }
@@ -113,10 +111,10 @@ fn spawn_notification_thread(driver: ZWave,
                     if !should_expose(v) {
                         continue;
                     }
-                    let mut db = always_lock(driver.values.lock());
+                    let mut db = always_lock(driver.items.lock());
                     let (name, exists) = match cfg.lookup_device(v) {
                         Some(name) => {
-                            let exists = if let Some(_) = db.get(&v) {
+                            let exists = if let Some(_) = db.get_name(&v) {
                                 warn!("duplicate match found for {}", name);
                                 true
                             } else {
@@ -126,7 +124,7 @@ fn spawn_notification_thread(driver: ZWave,
                         }
                         None => {
                             if cfg.expose_unbound.unwrap_or(true) {
-                                if let Some(name) = db.get(&v) {
+                                if let Some(name) = db.get_name(&v) {
                                     warn!("duplicate match found for unconfigured {}", name);
                                     (name.clone(), true)
                                 } else {
@@ -142,12 +140,12 @@ fn spawn_notification_thread(driver: ZWave,
                             }
                         }
                     };
-                    let item = Item::item(&name, v);
-                    if !exists {
+                    let item = if !exists {
                         debug!("adding value {} to db", name);
-                        db.insert(v, name.clone());
-                        always_lock(driver.catt_values.lock()).insert(name.clone(), item.clone());
-                    }
+                        db.add_value(name.clone(), v)
+                    } else {
+                        Item::item(&name, v)
+                    };
                     Notification::Added(item)
                 }
 
@@ -155,8 +153,8 @@ fn spawn_notification_thread(driver: ZWave,
                     if !should_expose(v) {
                         continue;
                     }
-                    let db = always_lock(driver.values.lock());
-                    let name = match db.get(&v) {
+                    let db = always_lock(driver.items.lock());
+                    let name = match db.get_name(&v) {
                         Some(n) => n,
                         None => continue,
                     };
@@ -169,15 +167,16 @@ fn spawn_notification_thread(driver: ZWave,
                     if !should_expose(v) {
                         continue;
                     }
-                    let mut db = always_lock(driver.values.lock());
-                    let name = match db.get(&v) {
+                    let mut db = always_lock(driver.items.lock());
+                    let name = match db.get_name(&v) {
                         Some(n) => n.clone(),
                         None => continue,
                     };
                     debug!("removing value {} from db", name);
-                    db.remove(&v);
-                    always_lock(driver.catt_values.lock()).remove(&name);
-                    Notification::Removed(Item::item(&name, v))
+                    Notification::Removed(match db.remove_value(v) {
+                        Some(it) => it,
+                        None => Item::item(&name, v),
+                    })
                 }
 
                 ZWaveNotification::Generic(s) => {
@@ -190,8 +189,8 @@ fn spawn_notification_thread(driver: ZWave,
 
                 ZWaveNotification::StateStarting(c) => {
                     let db_name = format!("zwave_{}_Controller", c.get_home_id());
-                    let db = always_lock(driver.catt_values.lock());
-                    match db.get(&db_name) {
+                    let db = always_lock(driver.items.lock());
+                    match db.get_item(&db_name) {
                         Some(controller) => Notification::Changed(controller.clone()),
                         None => {
                             debug!("controller not found in item db");
@@ -201,8 +200,8 @@ fn spawn_notification_thread(driver: ZWave,
                 }
                 ZWaveNotification::StateCompleted(c) => {
                     let db_name = format!("zwave_{}_Controller", c.get_home_id());
-                    let db = always_lock(driver.catt_values.lock());
-                    match db.get(&db_name) {
+                    let db = always_lock(driver.items.lock());
+                    match db.get_item(&db_name) {
                         Some(controller) => {
                             let _ = controller.set_value(Value::String("idle".into()));
                             Notification::Changed(controller.clone())
@@ -216,8 +215,8 @@ fn spawn_notification_thread(driver: ZWave,
 
                 ZWaveNotification::StateFailed(c) => {
                     let db_name = format!("zwave_{}_Controller", c.get_home_id());
-                    let db = always_lock(driver.catt_values.lock());
-                    match db.get(&db_name) {
+                    let db = always_lock(driver.items.lock());
+                    match db.get_item(&db_name) {
                         Some(controller) => {
                             let _ = controller.set_value(Value::String("failed".into()));
                             Notification::Changed(controller.clone())

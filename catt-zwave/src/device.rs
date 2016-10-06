@@ -1,78 +1,40 @@
-use std::fmt;
-use std::fmt::Display;
 use openzwave_stateful::ValueID;
-use openzwave_stateful::Node;
 
-use std::collections::BTreeSet;
+use std::collections::BTreeMap;
 
-#[derive(Eq, PartialEq, Debug)]
-pub struct Device {
-    pub node: Node,
-    pub values: BTreeSet<ValueID>,
+use item::Item;
+
+#[derive(Default)]
+pub struct DB {
+    values: BTreeMap<ValueID, String>,
+    catt_values: BTreeMap<String, Item>,
 }
 
-impl PartialOrd for Device {
-    fn partial_cmp(&self, other: &Self) -> Option<::std::cmp::Ordering> {
-        self.node.get_id().partial_cmp(&other.node.get_id())
+impl DB {
+    pub fn get_name(&self, val: &ValueID) -> Option<&String> {
+        self.values.get(val)
     }
-}
 
-impl Ord for Device {
-    fn cmp(&self, other: &Self) -> ::std::cmp::Ordering {
-        self.node.get_id().cmp(&other.node.get_id())
+    pub fn get_item(&self, name: &String) -> Option<&Item> {
+        self.catt_values.get(name)
     }
-}
 
-impl Display for Device {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        PrettyNode(&self.node).fmt(f)?;
-        PrettyValues(&self.values).fmt(f)?;
-        Ok(())
+    pub fn add_value(&mut self, name: String, val: ValueID) -> Item {
+        let item = Item::item(&name, val);
+        self.values.insert(val, name.clone());
+        self.catt_values.insert(name.clone(), item.clone());
+        item
     }
-}
 
-#[derive(Debug)]
-struct PrettyNode<'a>(&'a Node);
-#[derive(Debug)]
-struct PrettyValues<'a>(&'a BTreeSet<ValueID>);
-
-
-impl<'a> Display for PrettyNode<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        writeln!(f, "Node {}:", self.0.get_id())?;
-        writeln!(f, "\tProduct: {}", self.0.get_product_name())?;
-        writeln!(f, "\tManufacturer: {}", self.0.get_manufacturer_name())?;
-        writeln!(f, "\tType: {}", self.0.get_type())?;
-        Ok(())
+    pub fn add_item(&mut self, name: String, item: Item) {
+        self.catt_values.insert(name, item);
     }
-}
 
-impl<'a> Display for PrettyValues<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let mut cc = None;
-        for v in self.0.iter() {
-            let new_cc = if let Some(c) = cc {
-                if v.get_command_class_id() != c as u8 {
-                    true
-                } else {
-                    false
-                }
-            } else {
-                true
-            };
+    pub fn remove_item(&mut self, name: &String) -> Option<Item> {
+        self.catt_values.remove(name)
+    }
 
-            if new_cc {
-                cc = Some(v.get_command_class().unwrap());
-                writeln!(f, "\tCommandClass {}", v.get_command_class().unwrap())?;
-            }
-
-            writeln!(f, "\t\tValue {}:", v.get_index())?;
-            writeln!(f, "\t\t\tLabel: {}", v.get_label())?;
-            writeln!(f, "\t\t\tHelp {}", v.get_help())?;
-            writeln!(f, "\t\t\tGenre: {:?}", v.get_genre())?;
-            writeln!(f, "\t\t\tType: {:?}", v.get_type())?;
-            writeln!(f, "\t\t\tState: {}", v.as_string().unwrap_or("???".into()))?;
-        }
-        Ok(())
+    pub fn remove_value(&mut self, val: ValueID) -> Option<Item> {
+        self.values.remove(&val).and_then(|name| self.catt_values.remove(&name))
     }
 }

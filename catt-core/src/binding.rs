@@ -1,7 +1,3 @@
-use std::collections::BTreeMap;
-
-use std::sync::Arc;
-use std::sync::Mutex;
 use std::sync::mpsc::Receiver;
 
 use item::Item;
@@ -20,5 +16,5 @@ pub trait Binding {
     fn new(&Self::Config) -> Result<(Self, Receiver<Notification<Self::Item>>), Self::Error>
         where Self: ::std::marker::Sized;
 
-    fn get_values(&self) -> Arc<Mutex<BTreeMap<String, Self::Item>>>;
+    fn get_value(&self, &str) -> Option<Self::Item>;
 }
