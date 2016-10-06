@@ -18,7 +18,7 @@ use openzwave_stateful::ValueGenre;
 use openzwave_stateful::ValueType;
 use openzwave_stateful::ZWaveNotification;
 
-use config::ZWaveConfig;
+use config::Config;
 
 use errors::*;
 use item::Item;
@@ -34,7 +34,7 @@ pub struct ZWave {
 }
 
 impl ZWave {
-    pub fn new(cfg: &ZWaveConfig) -> Result<(ZWave, Receiver<Notification<Item>>)> {
+    pub fn new(cfg: &Config) -> Result<(ZWave, Receiver<Notification<Item>>)> {
         let cfg = cfg.clone();
         let (manager, notifications) = {
             let sys_config: ozw::ConfigPath = cfg.sys_config
@@ -71,7 +71,7 @@ impl ZWave {
 }
 
 impl Binding for ZWave {
-    type Config = ZWaveConfig;
+    type Config = Config;
     type Error = Error;
     type Item = Item;
 
@@ -85,7 +85,7 @@ impl Binding for ZWave {
 }
 
 fn spawn_notification_thread(driver: ZWave,
-                             cfg: ZWaveConfig,
+                             cfg: Config,
                              output: Sender<Notification<Item>>,
                              rx: Receiver<ZWaveNotification>) {
     ::std::thread::spawn(move || {

@@ -23,7 +23,6 @@ use catt_zwave::driver::ZWave;
 extern crate rustc_serialize;
 extern crate toml;
 
-mod config;
 mod errors;
 
 use errors::*;
