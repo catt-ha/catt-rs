@@ -1,0 +1,21 @@
+language: rust
+sudo: required
+dist: trusty
+services:
+  - docker
+rust:
+  - nightly
+before_install:
+  - sudo apt-get update -qq
+  - sudo apt-get install openssl libudev-dev
+script: make
+after_success:
+  - if [ "$TRAVIS_BRANCH" == "master" ]; then
+    docker login -e="$DOCKER_EMAIL" -u="$DOCKER_USERNAME" -p="$DOCKER_PASSWORD";
+    docker push cattha/catt-rs;
+    fi
+env:
+  global:
+    - DOCKER_USERNAME=jechas01
+    - DOCKER_EMAIL=josh@jec.pw
+    - secure: u/2GLganDFK0CBf0KZTBhjjuJMBXP/UBA+XphuVKIXuR2jnDUA2RnTKc26JiuyWyu7W3GLl5GMTHo0VGwjJBCOhDJw65ZihMXrkPJ46+/fqr8ku4T6WW2UdNXY4pKptP32BACtxyRBSN+jnB5SmUnDrtftm/UgN8mzLNOW1YoNY4eTZNMk61mwM4j17zXqzTe09pxV+a6Lp39l+x46VEVTEXmv+NtRo9PbuarDlAT1A+IXuBzhlaRdZVVrz6jofKbwN2KCExI5KmiN5E1yUq1SxRChb1sGeQ2c2/lJdnn++hB+VngFBmGlvJ6W5dDarwxMqtOUq3sqwWkGPOMWAwiknV8RfjJIAYhJxqkV76vGyDHj9kBtvUNlKc6AcN65t+exLuhaXCoN4SjmBWMfh5aKTK2IP25OtoTJXgsjtzC3QJbR55j2NcbuUJXD2rE+ErCOUMm//axq6XEOsGH0isbnSQugm5ZncZeXqF1QxxaXBQBb9ryPvfk1AsTXilJqaowVrwrXZ+FUNadSCN2xS6r8OXQJUyrIlCUtuqGtRRH33T/f1zjo0Cs6XxltGgZabfmQJSzcdjTIgIgPiO3VvUMBacNqD4PPf6TbDm/rugC2tSlBX18Ds4mxkUKtR6zU3/x0z5GhWMomEPc4Qz/Z7oaufLsqv1Q6CkKCtCjdJGkMU=
