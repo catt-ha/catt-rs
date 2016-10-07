@@ -1,0 +1,3 @@
+from busybox
+
+ADD output /
