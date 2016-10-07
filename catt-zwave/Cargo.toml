@@ -10,7 +10,6 @@ catt-core = { path = "../catt-core" }
 log = "*"
 error-chain = "*"
 rustc-serialize = "*"
-net2 = { version = "*", default-features = true }
 
 [dev-dependencies]
 env_logger = "*"
