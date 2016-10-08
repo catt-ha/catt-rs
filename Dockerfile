@@ -1,3 +1,3 @@
 from busybox
 
-ADD output /
+ADD docker_fs /
