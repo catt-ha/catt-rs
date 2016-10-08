@@ -38,15 +38,17 @@ pub struct Bridge<B, C> {
 
 impl<B, C> Bridge<B, C>
     where B: ::bus::Bus + Clone + Send + 'static,
-          C: ::binding::Binding + Clone + Send + 'static
+          C: ::binding::Binding + Clone + Send + 'static,
+          B::Config: Default,
+          C::Config: Default
 {
     pub fn new(cfg: Config<B::Config, C::Config>) -> Result<Self> {
 
-        let (bus, messages) = match B::new(&cfg.bus) {
+        let (bus, messages) = match B::new(&cfg.bus.unwrap_or_default()) {
             Ok(b) => b,
             Err(e) => return Err(ErrorKind::Bus(Box::new(e)).into()),
         };
-        let (binding, notifications) = match C::new(&cfg.binding) {
+        let (binding, notifications) = match C::new(&cfg.binding.unwrap_or_default()) {
             Ok(b) => b,
             Err(e) => return Err(ErrorKind::Binding(Box::new(e)).into()),
         };

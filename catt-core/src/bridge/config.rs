@@ -24,8 +24,8 @@ error_chain! {
 
 #[derive(Default, RustcDecodable)]
 pub struct Config<B, C> {
-    pub bus: B,
-    pub binding: C,
+    pub bus: Option<B>,
+    pub binding: Option<C>,
 }
 
 impl<B, C> Config<B, C> {
