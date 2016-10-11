@@ -9,7 +9,8 @@ error-chain = "*"
 log = "*"
 rustc-serialize = "*"
 toml = "*"
-rumqtt = { git = "https://github.com/Ather-Energy/RuMqtt.git" }
+chrono = "*"
+rumqtt = { git = "https://github.com/Ather-Energy/RuMqtt.git", rev = "f0454534cd3bed6ae637c958ec614bc41e404a94" }
 
 [dev-dependencies]
 env_logger = "*"
