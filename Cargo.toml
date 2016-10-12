@@ -3,18 +3,22 @@
 [package]
 name = "catt"
 version = "0.1.0"
-authors = ["Josh Chase <jcjoshuachase@gmail.com>"]
+authors = ["Josh Chase <josh@jec.pw>"]
+license = "MIT/Apache-2.0"
+description = "CATT executables"
+keywords = ["IoT", "homeautomation", "zwave", "mqtt"]
+repository = "https://github.com/catt-ha/catt-rs"
 
 [dependencies]
-env_logger = "*"
-log = "*"
-rustc-serialize = "*"
-toml = "*"
-error-chain = "*"
+env_logger = "0.3"
+log = "0.3"
+rustc-serialize = "0.3"
+toml = "0.2"
+error-chain = "0.5"
 
-catt-core = { path = "./catt-core" }
-catt-mqtt = { path = "./catt-mqtt" }
-catt-zwave = { path = "./catt-zwave" }
+catt-core = { path = "./catt-core", version = "0.1" }
+catt-mqtt = { path = "./catt-mqtt", version = "0.1" }
+catt-zwave = { path = "./catt-zwave", version = "0.1" }
 
 [[bin]]
 name = "zwave"

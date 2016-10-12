@@ -1,16 +1,20 @@
 [package]
 name = "catt-mqtt"
 version = "0.1.0"
-authors = ["Josh Chase <jcjoshuachase@gmail.com>"]
+authors = ["Josh Chase <josh@jec.pw>"]
+license = "MIT/Apache-2.0"
+description = "CATT mqtt bus implementation"
+keywords = ["IoT", "homeautomation", "mqtt"]
+repository = "https://github.com/catt-ha/catt-rs"
 
 [dependencies]
-catt-core = { path = "../catt-core" }
-error-chain = "*"
-log = "*"
-rustc-serialize = "*"
-toml = "*"
-chrono = "*"
+catt-core = { path = "../catt-core", version = "0.1" }
 rumqtt = { git = "https://github.com/Ather-Energy/RuMqtt.git", rev = "f0454534cd3bed6ae637c958ec614bc41e404a94" }
+error-chain = "0.5"
+log = "0.3"
+rustc-serialize = "0.3"
+toml = "0.2"
+chrono = "0.2"
 
 [dev-dependencies]
-env_logger = "*"
+env_logger = "0.3"

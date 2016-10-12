@@ -1,15 +1,19 @@
 [package]
 name = "catt-zwave"
 version = "0.1.0"
-authors = ["Josh Chase <jcjoshuachase@gmail.com>"]
+authors = ["Josh Chase <josh@jec.pw>"]
+license = "MIT/Apache-2.0"
+description = "CATT zwave binding implementation"
+keywords = ["IoT", "homeautomation", "zwave"]
+repository = "https://github.com/catt-ha/catt-rs"
 
 [dependencies]
 serial_ports = { git = "https://github.com/dhylands/serial-ports-rs" }
 openzwave = { git = "https://github.com/fxbox/openzwave-rust" }
-catt-core = { path = "../catt-core" }
-log = "*"
-error-chain = "*"
-rustc-serialize = "*"
+catt-core = { path = "../catt-core", version = "0.1" }
+log = "0.3"
+error-chain = "0.5"
+rustc-serialize = "0.3"
 
 [dev-dependencies]
 env_logger = "*"

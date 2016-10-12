@@ -1,11 +1,15 @@
 [package]
 name = "catt-core"
 version = "0.1.0"
-authors = ["Josh Chase <jcjoshuachase@gmail.com>"]
+authors = ["Josh Chase <josh@jec.pw>"]
+license = "MIT/Apache-2.0"
+description = "CATT core traits and types"
+keywords = ["IoT", "homeautomation"]
+repository = "https://github.com/catt-ha/catt-rs"
 
 [dependencies]
-toml = "*"
-error-chain = "*"
-rustc-serialize = "*"
-log = "*"
-byteorder = "*"
+toml = "0.2"
+error-chain = "0.5"
+rustc-serialize = "0.3"
+log = "0.3"
+byteorder = "0.5"
