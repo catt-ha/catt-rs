@@ -10,9 +10,12 @@ before_install:
   - sudo apt-get install openssl libudev-dev
 script: make docker
 after_success:
+  - docker login -e="$DOCKER_EMAIL" -u="$DOCKER_USERNAME" -p="$DOCKER_PASSWORD"
+  - docker tag cattha/catt-rs cattha/catt-rs:$TRAVIS_BRANCH
   - if [ "$TRAVIS_BRANCH" == "master" ]; then
-    docker login -e="$DOCKER_EMAIL" -u="$DOCKER_USERNAME" -p="$DOCKER_PASSWORD";
     docker push cattha/catt-rs;
+    else
+    docker push cattha/catt-rs:$TRAVIS_BRANCH;
     fi
 env:
   global:
