@@ -40,7 +40,10 @@ error_chain! {
     }
 }
 
-pub fn new<B, C>(handle: &Handle, cfg: Config<B::Config, C::Config>) -> Result<(impl Future<Item=(), Error=Error>, impl Future<Item=(), Error=Error>)>
+pub fn new<B, C>
+    (handle: &Handle,
+     cfg: Config<B::Config, C::Config>)
+     -> Result<(impl Future<Item = (), Error = Error>, impl Future<Item = (), Error = Error>)>
     where B: Bus,
           C: Binding,
           B::Config: Default,
@@ -56,22 +59,22 @@ pub fn new<B, C>(handle: &Handle, cfg: Config<B::Config, C::Config>) -> Result<(
         Err(e) => return Err(ErrorKind::Binding(Box::new(e)).into()),
     };
 
-    let msg_fut = messages
-        .map_err(Error::from)
+    let msg_fut = messages.map_err(Error::from)
         .for_each(bus_to_binding(binding));
-    let not_fut = notifications
-        .map_err(Error::from)
+    let not_fut = notifications.map_err(Error::from)
         .for_each(binding_to_bus(bus));
 
     Ok((msg_fut, not_fut))
 }
 
-pub fn from_file<B, C>(handle: &Handle, config_file: &str) -> Result<(impl Future<Item=(), Error=Error>, impl Future<Item=(), Error=Error>)>
+pub fn from_file<B, C>
+    (handle: &Handle,
+     config_file: &str)
+     -> Result<(impl Future<Item = (), Error = Error>, impl Future<Item = (), Error = Error>)>
     where B: Bus,
           C: Binding,
           B::Config: Default + Decodable,
-          C::Config: Default + Decodable,
-
+          C::Config: Default + Decodable
 {
 
     let cfg: Config<B::Config, C::Config> = Config::from_file(config_file)?;
@@ -89,7 +92,7 @@ fn bus_to_binding<C>(binding: C) -> impl FnMut(Message) -> Result<()>
             Message::Command(ref name, ref value) => (name, value),
             _ => {
                 debug!("not a command, dropping message");
-                return Ok(())
+                return Ok(());
             }
         };
 
@@ -97,7 +100,7 @@ fn bus_to_binding<C>(binding: C) -> impl FnMut(Message) -> Result<()>
             Some(v) => v.clone(),
             None => {
                 debug!("could not find item for command");
-                return Ok(())
+                return Ok(());
             }
         };
 

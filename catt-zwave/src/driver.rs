@@ -94,9 +94,10 @@ fn get_default_devices() -> Vec<String> {
                                "/dev/ttyUSB0", // Linux (Aeotech Z-Stick S2)
                                "/dev/ttyACM0" /* Linux (Aeotech Z-Stick Gen-5) */];
 
-        if let Some(default_device) = default_devices.iter()
-            .find(|device_name| fs::metadata(device_name).is_ok())
-            .map(|&str| str.to_owned()) {
+        if let Some(default_device) =
+            default_devices.iter()
+                .find(|device_name| fs::metadata(device_name).is_ok())
+                .map(|&str| str.to_owned()) {
             ports.push(default_device);
         }
     }

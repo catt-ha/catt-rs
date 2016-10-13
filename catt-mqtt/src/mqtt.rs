@@ -130,9 +130,7 @@ impl Mqtt {
             .with_callback(message_callback(tx))
             .start()?;
 
-        Ok((Mqtt {
-            client: client,
-        }, rx))
+        Ok((Mqtt { client: client }, rx))
     }
 
     fn get_client(&self) -> &MqttClient {
@@ -147,7 +145,7 @@ fn message_callback(tx: Mutex<Sender<Message>>) -> impl Fn(rumqtt::Message) {
 
         if topic.len() < 2 {
             warn!("message with invalid path received: {}",
-                message.topic.as_str());
+                  message.topic.as_str());
             return;
         }
 
@@ -180,7 +178,7 @@ fn message_callback(tx: Mutex<Sender<Message>>) -> impl Fn(rumqtt::Message) {
             Ok(_) => {}
             Err(e) => warn!("channel send error: {}", e),
         }
-    }
+    };
 }
 
 impl Bus for Mqtt {

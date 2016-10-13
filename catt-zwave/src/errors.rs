@@ -4,7 +4,7 @@ use catt_core::value;
 
 error_chain! {
     links {
-        value::Error, value::ErrorKind, ValueError;
+            value::Error, value::ErrorKind, ValueError;
     }
 
     foreign_links {
@@ -17,13 +17,16 @@ error_chain! {
     }
 
     errors {
-        Unimplemented(item_name: String, value_type: ozw::value_classes::value_id::ValueType) {
+        Unimplemented(item_name: String,
+                      value_type: ozw::value_classes::value_id::ValueType) {
             description("unimplemented zwave value type")
-            display("unimplemented zwave value type for item {}: {:?}", item_name, value_type)
+            display("unimplemented zwave value type for item {}: {:?}",
+                    item_name, value_type)
         }
         InvalidType(item_name: String, provided: &'static str, actual: &'static str) {
             description("invalid provided value type")
-            display("invalid type provided for {}: {}. actual type is {}.", item_name, provided, actual)
+            display("invalid type provided for {}: {}. actual type is {}.",
+                    item_name, provided, actual)
         }
         NoValue(item_name: String) {
             description("item has no value")
