@@ -1,3 +1,4 @@
+#![feature(conservative_impl_trait)]
 #![feature(question_mark)]
 
 #[macro_use]
@@ -12,6 +13,9 @@ extern crate rustc_serialize;
 extern crate byteorder;
 
 extern crate toml;
+
+extern crate futures;
+extern crate tokio_core;
 
 pub mod util;
 pub mod bus;

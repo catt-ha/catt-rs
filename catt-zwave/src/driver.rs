@@ -1,9 +1,6 @@
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::MutexGuard;
-use std::sync::mpsc::channel;
-use std::sync::mpsc::Receiver;
-use std::sync::mpsc::Sender;
 
 use std::fs;
 
@@ -26,6 +23,11 @@ use openzwave::notification::ControllerState;
 
 use serial_ports::{ListPortInfo, ListPorts};
 use serial_ports::ListPortType::UsbPort;
+
+use tokio_core::reactor::Handle;
+use tokio_core::channel::channel;
+use tokio_core::channel::Sender;
+use tokio_core::channel::Receiver;
 
 use config::Config;
 
@@ -111,7 +113,7 @@ pub struct ZWave {
 }
 
 impl ZWave {
-    pub fn new(cfg: &Config) -> Result<(ZWave, Receiver<Notification<Item>>)> {
+    pub fn new(handle: &Handle, cfg: &Config) -> Result<(ZWave, Receiver<Notification<Item>>)> {
         let cfg = cfg.clone();
 
         let mut manager = {
@@ -142,7 +144,8 @@ impl ZWave {
 
         let manager = Arc::new(Mutex::new(manager));
         let items = Arc::new(Mutex::new(Default::default()));
-        let (tx, rx) = channel();
+
+        let (tx, rx) = channel(handle)?;
 
         let driver = ZWave {
             ozw_manager: manager.clone(),
@@ -152,7 +155,7 @@ impl ZWave {
         let watcher = Watcher {
             cfg: cfg,
             driver: driver.clone(),
-            output: Arc::new(Mutex::new(tx)),
+            output: Mutex::new(tx),
         };
 
         always_lock(manager.lock()).add_watcher(watcher)?;
@@ -170,8 +173,8 @@ impl Binding for ZWave {
     type Error = Error;
     type Item = Item;
 
-    fn new(cfg: &Self::Config) -> Result<(Self, Receiver<Notification<Item>>)> {
-        ZWave::new(cfg)
+    fn new(handle: &Handle, cfg: &Self::Config) -> Result<(Self, Receiver<Notification<Item>>)> {
+        ZWave::new(handle, cfg)
     }
 
     fn get_value(&self, name: &str) -> Option<Item> {
@@ -182,7 +185,7 @@ impl Binding for ZWave {
 struct Watcher {
     driver: ZWave,
     cfg: Config,
-    output: Arc<Mutex<Sender<Notification<Item>>>>,
+    output: Mutex<Sender<Notification<Item>>>,
 }
 
 impl Watcher {
@@ -201,7 +204,7 @@ impl ozw::manager::NotificationWatcher for Watcher {
                                                   home_id);
                 always_lock(self.driver.items.lock())
                     .add_item(controller.get_name(), controller.clone());
-                self.get_out().send(Notification::Added(controller.clone())).unwrap();
+                let _ = self.get_out().send(Notification::Added(controller.clone()));
                 Notification::Changed(controller)
             }
             NotificationType::Type_AllNodesQueried |

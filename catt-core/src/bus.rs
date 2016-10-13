@@ -1,4 +1,5 @@
-use std::sync::mpsc::Receiver;
+use tokio_core::reactor::Handle;
+use tokio_core::channel::Receiver;
 
 use value::Value;
 use item::Meta;
@@ -22,7 +23,7 @@ pub trait Bus {
     type Config;
     type Error: ::std::error::Error + Send + 'static;
 
-    fn new(&Self::Config) -> Result<(Self, Receiver<Message>), Self::Error>
+    fn new(&Handle, &Self::Config) -> Result<(Self, Receiver<Message>), Self::Error>
         where Self: ::std::marker::Sized;
 
     fn publish(&self, Message) -> Result<(), Self::Error>;

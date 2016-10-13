@@ -6,12 +6,12 @@ use config::Config;
 use config::MQTT_BASE_DEFAULT;
 
 use std::sync::Mutex;
-use std::sync::MutexGuard;
-use std::sync::Arc;
 
-use std::sync::mpsc::channel;
-use std::sync::mpsc::Receiver;
-use std::sync::mpsc::Sender;
+use tokio_core::reactor::Handle;
+
+use tokio_core::channel::channel;
+use tokio_core::channel::Receiver;
+use tokio_core::channel::Sender;
 
 use catt_core::bus::Bus;
 use catt_core::bus::Message;
@@ -117,14 +117,13 @@ impl MqttClient {
     }
 }
 
-#[derive(Clone)]
 pub struct Mqtt {
-    client: Arc<Mutex<MqttClient>>,
+    client: MqttClient,
 }
 
 impl Mqtt {
-    pub fn with_config(cfg: &Config) -> Result<(Self, Receiver<Message>)> {
-        let (tx, rx) = channel();
+    pub fn with_config(handle: &Handle, cfg: &Config) -> Result<(Self, Receiver<Message>)> {
+        let (tx, rx) = channel(handle)?;
         let tx = Mutex::new(tx);
 
         let client = MqttClient::with_config(cfg)?
@@ -132,12 +131,12 @@ impl Mqtt {
             .start()?;
 
         Ok((Mqtt {
-            client: Arc::new(Mutex::new(client)),
+            client: client,
         }, rx))
     }
 
-    fn get_client(&self) -> MutexGuard<MqttClient> {
-        ::catt_core::util::always_lock(self.client.lock())
+    fn get_client(&self) -> &MqttClient {
+        &self.client
     }
 }
 
@@ -188,8 +187,8 @@ impl Bus for Mqtt {
     type Config = Config;
     type Error = Error;
 
-    fn new(cfg: &Self::Config) -> Result<(Self, Receiver<Message>)> {
-        Mqtt::with_config(cfg)
+    fn new(handle: &Handle, cfg: &Self::Config) -> Result<(Self, Receiver<Message>)> {
+        Mqtt::with_config(handle, cfg)
     }
 
     fn publish(&self, message: Message) -> Result<()> {

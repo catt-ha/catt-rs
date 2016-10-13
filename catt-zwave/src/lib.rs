@@ -13,6 +13,9 @@ extern crate catt_core;
 
 extern crate rustc_serialize;
 
+extern crate futures;
+extern crate tokio_core;
+
 pub mod config;
 pub mod device;
 pub mod driver;

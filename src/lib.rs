@@ -1,9 +1,6 @@
 #![recursion_limit = "1024"]
 #![feature(conservative_impl_trait)]
 #![feature(question_mark)]
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 
 #[macro_use]
 extern crate error_chain;
@@ -15,19 +12,31 @@ extern crate catt_mqtt;
 #[macro_use]
 extern crate log;
 
-use catt_core::bridge::Bridge;
-use catt_core::bridge::Config;
-use catt_mqtt::mqtt::Mqtt;
+use catt_core::bridge;
+
 use catt_zwave::driver::ZWave;
+use catt_mqtt::mqtt::Mqtt;
 
 extern crate rustc_serialize;
 extern crate toml;
+
+extern crate futures;
+extern crate tokio_core;
+
+use futures::Future;
+
+use tokio_core::reactor::Core;
 
 mod errors;
 
 use errors::*;
 
-pub fn init(config_file: &str) -> Result<Bridge<Mqtt, ZWave>> {
-    let cfg = Config::from_file(config_file)?;
-    Ok(Bridge::new(cfg)?)
+pub fn zwave(cfg: &str) -> Result<()> {
+    let mut reactor = Core::new().unwrap();
+    let handle = reactor.handle();
+    let (f1, f2) = bridge::from_file::<Mqtt, ZWave>(&handle, &cfg)?;
+
+    let _ = reactor.run(f1.select(f2));
+
+    Ok(())
 }

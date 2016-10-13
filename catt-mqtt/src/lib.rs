@@ -15,6 +15,9 @@ extern crate catt_core;
 
 extern crate toml;
 
+extern crate tokio_core;
+extern crate futures;
+
 pub mod errors;
 pub mod config;
 

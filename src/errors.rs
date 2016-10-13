@@ -1,5 +1,7 @@
 #![allow(dead_code)]
 
+use futures;
+
 use catt_zwave::errors as zwave;
 use catt_mqtt::errors as mqtt;
 use catt_core::bridge;
@@ -14,6 +16,7 @@ error_chain!(
     }
 
     foreign_links {
+        futures::Canceled, Canceled;
         ::std::io::Error, IoError;
         ::toml::DecodeError, TomlDecodeError;
     }
