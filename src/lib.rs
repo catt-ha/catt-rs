@@ -23,8 +23,6 @@ extern crate toml;
 extern crate futures;
 extern crate tokio_core;
 
-use futures::Future;
-
 use tokio_core::reactor::Core;
 
 mod errors;
@@ -34,9 +32,9 @@ use errors::*;
 pub fn zwave(cfg: &str) -> Result<()> {
     let mut reactor = Core::new().unwrap();
     let handle = reactor.handle();
-    let (f1, f2) = bridge::from_file::<Mqtt, ZWave>(&handle, &cfg)?;
+    let fut = bridge::from_file::<Mqtt, ZWave>(&handle, &cfg)?;
 
-    let _ = reactor.run(f1.select(f2));
+    let _ = reactor.run(fut);
 
     Ok(())
 }

@@ -2,7 +2,6 @@ use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::MutexGuard;
 
-use catt_core::item::Item;
 use catt_core::item::Meta;
 use catt_core::value::Value;
 
@@ -31,16 +30,12 @@ impl ControllerItem {
     pub fn get_state(&self) -> MutexGuard<String> {
         ::catt_core::util::always_lock(self.state.lock())
     }
-}
 
-impl Item for ControllerItem {
-    type Error = Error;
-
-    fn get_name(&self) -> String {
+    pub fn get_name(&self) -> String {
         self.name.clone()
     }
 
-    fn get_meta(&self) -> Option<Meta> {
+    pub fn get_meta(&self) -> Option<Meta> {
         Some(Meta {
             backend: "zwave".to_string().into(),
             value_type: "string".to_string().into(),
@@ -48,12 +43,12 @@ impl Item for ControllerItem {
         })
     }
 
-    fn get_value(&self) -> Result<Value> {
+    pub fn get_value(&self) -> Result<Value> {
         let s = self.get_state();
         Ok(Value::String(s.clone()))
     }
 
-    fn set_value(&self, val: Value) -> Result<()> {
+    pub fn set_value(&self, val: Value) -> Result<()> {
         let manager = self.driver.get_manager();
 
         let cmd = val.as_string()?.trim().to_lowercase();

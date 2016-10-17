@@ -24,6 +24,8 @@ use openzwave::notification::ControllerState;
 use serial_ports::{ListPortInfo, ListPorts};
 use serial_ports::ListPortType::UsbPort;
 
+use futures::{self, Future, BoxFuture};
+
 use tokio_core::reactor::Handle;
 use tokio_core::channel::channel;
 use tokio_core::channel::Sender;
@@ -178,8 +180,11 @@ impl Binding for ZWave {
         ZWave::new(handle, cfg)
     }
 
-    fn get_value(&self, name: &str) -> Option<Item> {
-        always_lock(self.items.lock()).get_item(&String::from(name)).map(|i| i.clone())
+    fn get_value(&self, name: &str) -> BoxFuture<Option<Item>, Error> {
+        futures::finished(always_lock(self.items.lock())
+                .get_item(&String::from(name))
+                .map(|i| i.clone()))
+            .boxed()
     }
 }
 
@@ -269,8 +274,8 @@ impl ozw::manager::NotificationWatcher for Watcher {
                     Some(n) => n,
                     None => return,
                 };
+                debug!("value {} changed: {:?}", name, v);
                 let item = Item::item(&name, v);
-                debug!("value {} changed: {:?}", item.get_name(), item.get_value());
                 Notification::Changed(item)
             }
 
@@ -302,8 +307,8 @@ impl ozw::manager::NotificationWatcher for Watcher {
             NotificationType::Type_ControllerCommand => {
                 let home_id = zwave_notification.get_home_id();
                 let db_name = format!("zwave_{}_Controller", home_id);
-                let controller = match self.driver.get_value(&db_name) {
-                    Some(c) => c,
+                let controller = match always_lock(self.driver.items.lock()).get_item(&db_name) {
+                    Some(c) => c.clone(),
                     None => {
                         debug!("controller not found in item db");
                         return;

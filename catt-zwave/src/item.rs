@@ -9,6 +9,8 @@ use driver::ZWave;
 use controller::ControllerItem;
 use zwave_item::ZWaveItem;
 
+use futures::{self, Future, BoxFuture};
+
 #[derive(Clone, Default)]
 pub struct Item {
     controller: Option<ControllerItem>,
@@ -40,39 +42,33 @@ impl item::Item for Item {
         unreachable!()
     }
 
-    fn get_value(&self) -> Result<CValue> {
-        if let Some(ref z_item) = self.zwave_item {
-            return z_item.get_value();
-        }
+    fn get_value(&self) -> BoxFuture<CValue, Error> {
+        let res = match self {
+            &Item { controller: None, zwave_item: Some(ref it) } => it.get_value(),
+            &Item { controller: Some(ref it), zwave_item: None } => it.get_value(),
+            _ => unreachable!(),
+        };
 
-        if let Some(ref controller) = self.controller {
-            return controller.get_value();
-        }
-
-        unreachable!()
+        futures::done(res).boxed()
     }
 
     fn get_meta(&self) -> Option<item::Meta> {
-        if let Some(ref z_item) = self.zwave_item {
-            return z_item.get_meta();
-        }
+        let res = match self {
+            &Item { controller: None, zwave_item: Some(ref it) } => it.get_meta(),
+            &Item { controller: Some(ref it), zwave_item: None } => it.get_meta(),
+            _ => unreachable!(),
+        };
 
-        if let Some(ref controller) = self.controller {
-            return controller.get_meta();
-        }
-
-        unreachable!()
+        res
     }
 
-    fn set_value(&self, value: CValue) -> Result<()> {
-        if let Some(ref z_item) = self.zwave_item {
-            return z_item.set_value(value);
-        }
+    fn set_value(&self, value: CValue) -> BoxFuture<(), Error> {
+        let res = match self {
+            &Item { controller: None, zwave_item: Some(ref it) } => it.set_value(value),
+            &Item { controller: Some(ref it), zwave_item: None } => it.set_value(value),
+            _ => unreachable!(),
+        };
 
-        if let Some(ref controller) = self.controller {
-            return controller.set_value(value);
-        }
-
-        unreachable!()
+        futures::done(res).boxed()
     }
 }

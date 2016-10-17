@@ -48,16 +48,12 @@ impl ZWaveItem {
     pub fn set_raw(&self, val: &Vec<u8>) -> Result<()> {
         Ok(self.ozw_value.set_raw(val)?)
     }
-}
 
-impl item::Item for ZWaveItem {
-    type Error = Error;
-
-    fn get_name(&self) -> String {
+    pub fn get_name(&self) -> String {
         self.name.clone()
     }
 
-    fn get_value(&self) -> Result<CValue> {
+    pub fn get_value(&self) -> Result<CValue> {
         let val_type = self.ozw_value.get_type();
         let val = match val_type {
             ValueType::ValueType_Button |
@@ -80,7 +76,7 @@ impl item::Item for ZWaveItem {
         Ok(val)
     }
 
-    fn get_meta(&self) -> Option<item::Meta> {
+    pub fn get_meta(&self) -> Option<item::Meta> {
         let mut ext = HashMap::new();
         ext.insert("label".into(), self.ozw_value.get_label());
         ext.insert("node_id".into(),
@@ -108,7 +104,7 @@ impl item::Item for ZWaveItem {
         })
     }
 
-    fn set_value(&self, value: CValue) -> Result<()> {
+    pub fn set_value(&self, value: CValue) -> Result<()> {
         let val_type = self.ozw_value.get_type();
         let res = match val_type {
             ValueType::ValueType_Raw => self.set_raw(&value.as_raw()?),

@@ -7,6 +7,8 @@ use config::MQTT_BASE_DEFAULT;
 
 use std::sync::Mutex;
 
+use futures::{self, Future, BoxFuture};
+
 use tokio_core::reactor::Handle;
 
 use tokio_core::channel::channel;
@@ -189,34 +191,41 @@ impl Bus for Mqtt {
         Mqtt::with_config(handle, cfg)
     }
 
-    fn publish(&self, message: Message) -> Result<()> {
-        debug!("publish {:?}", message);
-        let (name, message_type, payload) = match message {
-            Message::Update(name, value) => (name, "state", value.as_string()?),
-            Message::Command(name, value) => (name, "command", value.as_string()?),
-            Message::Meta(name, meta) => (name, "meta", toml::encode_str(&meta)),
-        };
-        let path = format!("{}/{}", name, message_type);
-        self.get_client().publish(&path, payload.as_bytes())
+    fn publish(&self, message: Message) -> BoxFuture<(), Error> {
+        futures::done((move || {
+                debug!("publish {:?}", message);
+                let (name, message_type, payload) = match message {
+                    Message::Update(ref name, ref value) => (name, "state", value.as_string()?),
+                    Message::Command(ref name, ref value) => (name, "command", value.as_string()?),
+                    Message::Meta(ref name, ref meta) => (name, "meta", toml::encode_str(&meta)),
+                };
+                let path = format!("{}/{}", name, message_type);
+                self.get_client().publish(&path, payload.as_bytes())
+            })())
+            .boxed()
     }
 
-    fn subscribe(&self, item_name: &str, sub_type: SubType) -> Result<()> {
+    fn subscribe(&self, item_name: &str, sub_type: SubType) -> BoxFuture<(), Error> {
         debug!("subscribe {}, {:?}", item_name, sub_type);
-        match sub_type {
-            SubType::Update => self.get_client().subscribe(&format!("{}/state", item_name)),
-            SubType::Command => self.get_client().subscribe(&format!("{}/command", item_name)),
-            SubType::Meta => self.get_client().subscribe(&format!("{}/meta", item_name)),
-            SubType::All => self.get_client().subscribe(&format!("{}/#", item_name)),
-        }
+        futures::done(match sub_type {
+                SubType::Update => self.get_client().subscribe(&format!("{}/state", item_name)),
+                SubType::Command => self.get_client().subscribe(&format!("{}/command", item_name)),
+                SubType::Meta => self.get_client().subscribe(&format!("{}/meta", item_name)),
+                SubType::All => self.get_client().subscribe(&format!("{}/#", item_name)),
+            })
+            .boxed()
     }
 
-    fn unsubscribe(&self, item_name: &str, sub_type: SubType) -> Result<()> {
+    fn unsubscribe(&self, item_name: &str, sub_type: SubType) -> BoxFuture<(), Error> {
         debug!("unsubscribe {}, {:?}", item_name, sub_type);
-        match sub_type {
-            SubType::Update => self.get_client().unsubscribe(&format!("{}/state", item_name)),
-            SubType::Command => self.get_client().unsubscribe(&format!("{}/command", item_name)),
-            SubType::Meta => self.get_client().unsubscribe(&format!("{}/meta", item_name)),
-            SubType::All => self.get_client().unsubscribe(&format!("{}/#", item_name)),
-        }
+        futures::done(match sub_type {
+                SubType::Update => self.get_client().unsubscribe(&format!("{}/state", item_name)),
+                SubType::Command => {
+                    self.get_client().unsubscribe(&format!("{}/command", item_name))
+                }
+                SubType::Meta => self.get_client().unsubscribe(&format!("{}/meta", item_name)),
+                SubType::All => self.get_client().unsubscribe(&format!("{}/#", item_name)),
+            })
+            .boxed()
     }
 }

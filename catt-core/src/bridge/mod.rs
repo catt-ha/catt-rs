@@ -1,6 +1,6 @@
-use rustc_serialize::Decodable;
-
 use tokio_core::reactor::Handle;
+
+use futures;
 use futures::stream::Stream;
 use futures::Future;
 
@@ -40,14 +40,11 @@ error_chain! {
     }
 }
 
-pub fn new<B, C>
-    (handle: &Handle,
-     cfg: Config<B::Config, C::Config>)
-     -> Result<(impl Future<Item = (), Error = Error>, impl Future<Item = (), Error = Error>)>
-    where B: Bus,
-          C: Binding,
-          B::Config: Default,
-          C::Config: Default
+pub fn new<B, C>(handle: &Handle,
+                 cfg: Config<B::Config, C::Config>)
+                 -> Result<impl Future<Item = (), Error = Error>>
+    where B: Bus + 'static,
+          C: Binding
 {
 
     let (bus, messages) = match B::new(handle, &cfg.bus.unwrap_or_default()) {
@@ -59,65 +56,75 @@ pub fn new<B, C>
         Err(e) => return Err(ErrorKind::Binding(Box::new(e)).into()),
     };
 
-    let msg_fut = messages.map_err(Error::from)
-        .for_each(bus_to_binding(binding));
-    let not_fut = notifications.map_err(Error::from)
-        .for_each(binding_to_bus(bus));
+    let msg_fut = bus_to_binding(handle, messages.map_err(Error::from), binding);
+    let not_fut = binding_to_bus(handle, notifications.map_err(Error::from), bus);
 
-    Ok((msg_fut, not_fut))
+    Ok(msg_fut.select(not_fut).map(|_| ()).map_err(|(e, _)| e))
 }
 
-pub fn from_file<B, C>
-    (handle: &Handle,
-     config_file: &str)
-     -> Result<(impl Future<Item = (), Error = Error>, impl Future<Item = (), Error = Error>)>
-    where B: Bus,
-          C: Binding,
-          B::Config: Default + Decodable,
-          C::Config: Default + Decodable
+pub fn from_file<B, C>(handle: &Handle,
+                       config_file: &str)
+                       -> Result<impl Future<Item = (), Error = Error>>
+    where B: Bus + 'static,
+          C: Binding
 {
 
     let cfg: Config<B::Config, C::Config> = Config::from_file(config_file)?;
     Ok(new::<B, C>(handle, cfg)?)
 }
 
-fn bus_to_binding<C>(binding: C) -> impl FnMut(Message) -> Result<()>
-    where C: Binding
+fn bus_to_binding<B, S>(handle: &Handle,
+                        msg_stream: S,
+                        binding: B)
+                        -> impl Future<Item = (), Error = Error>
+    where B: Binding,
+          S: Stream<Item = Message, Error = Error>
 {
-    move |msg| {
-        debug!("got message: {:?}", msg);
-
-        let (name, value) = match msg {
-            // only accept commands here
-            Message::Command(ref name, ref value) => (name, value),
-            _ => {
-                debug!("not a command, dropping message");
-                return Ok(());
+    let handle = handle.clone();
+    msg_stream.filter_map(|msg| {
+            debug!("got message: {:?}", msg);
+            match msg {
+                // only accept commands here
+                Message::Command(name, value) => Some((name, value)),
+                _ => {
+                    debug!("not a command, dropping message");
+                    None
+                }
             }
-        };
-
-        let val: C::Item = match binding.get_value(&name) {
-            Some(v) => v.clone(),
-            None => {
-                debug!("could not find item for command");
-                return Ok(());
-            }
-        };
-
-        match val.set_value(value.clone()) {
-            Ok(_) => {}
-            Err(e) => warn!("error setting value from {:?}: {:?}", msg, e),
-        };
-
-        Ok(())
-    }
+        })
+        .for_each(move |(name, value)| {
+            handle.spawn(binding.get_value(&name)
+                .map_err(|e| {
+                    warn!("error getting item from binding: {:#?}", e);
+                    e
+                })
+                .and_then(|opt| {
+                    match opt {
+                        Some(it) => it.set_value(value),
+                        None => futures::finished(()).boxed(),
+                    }
+                })
+                .map_err(|e| {
+                    warn!("error setting item value: {:#?}", e);
+                }));
+            Ok(())
+        })
 }
 
-fn binding_to_bus<B, V>(bus: B) -> impl FnMut(Notification<V>) -> Result<()>
-    where V: Item + Sized,
-          B: Bus
+fn binding_to_bus<B, S, V>(handle: &Handle,
+                           notification_stream: S,
+                           bus: B)
+                           -> impl Future<Item = (), Error = Error>
+    where V: Item + Sized + 'static,
+          B: Bus + 'static,
+          S: Stream<Item = Notification<V>, Error = Error>
 {
-    move |notification| {
+    let handle = handle.clone();
+
+    // need this so that we can use bus inside of a FnOnce
+    let bus = ::std::rc::Rc::new(bus);
+
+    notification_stream.for_each(move |notification| {
         let mut meta: Option<Meta> = None;
         let mut skip_state = false;
         let mut new_sub = false;
@@ -138,39 +145,36 @@ fn binding_to_bus<B, V>(bus: B) -> impl FnMut(Notification<V>) -> Result<()>
             }
         };
 
+        let name = val.get_name();
+
         if let Some(meta) = meta {
-            if let Err(e) = bus.publish(Message::Meta(val.get_name(), meta)) {
-                warn!("bus publish error: {:?}", e);
-            }
+            handle.spawn(bus.publish(Message::Meta(name.clone(), meta))
+                .map_err(|e| warn!("error publishing metadata: {:#?}", e)))
         }
 
         if new_sub {
-            if let Err(e) = bus.subscribe(&val.get_name(), SubType::Command) {
-                warn!("bus subscribe error: {:?}", e);
-            }
+            handle.spawn(bus.subscribe(&name, SubType::Command)
+                .map_err(|e| warn!("bus subscribe error: {:?}", e)));
         }
 
         if remove_sub {
-            if let Err(e) = bus.unsubscribe(&val.get_name(), SubType::Command) {
-                warn!("bus unsubscribe error: {:?}", e);
-            }
+            handle.spawn(bus.unsubscribe(&name, SubType::Command)
+                .map_err(|e| warn!("bus unsubscribe error: {:?}", e)));
         }
 
-        if skip_state {
-            return Ok(());
+        if !skip_state {
+            let state = val.get_value()
+                .map_err(|e| warn!("error getting item value: {:#?}", e))
+                .map(|v| Message::Update(name, v));
+            let bus = bus.clone();
+            let publish = state.and_then(move |msg| {
+                bus.publish(msg)
+                    .map_err(|e| warn!("new state publish error: {:#?}", e))
+            });
+
+            handle.spawn(publish);
         }
 
-        let value = match val.get_value() {
-            Ok(v) => v,
-            Err(e) => {
-                warn!("error getting item value: {:?}", e);
-                return Ok(());
-            }
-        };
-
-        if let Err(e) = bus.publish(Message::Update(val.get_name(), value)) {
-            warn!("bus publish error: {:?}", e);
-        }
         Ok(())
-    }
+    })
 }

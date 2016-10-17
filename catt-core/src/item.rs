@@ -1,3 +1,5 @@
+use futures::BoxFuture;
+
 use value::Value;
 
 use std::collections::HashMap;
@@ -10,7 +12,7 @@ pub struct Meta {
 }
 
 pub trait Item {
-    type Error: ::std::error::Error;
+    type Error: ::std::error::Error + Send + 'static;
 
     fn get_name(&self) -> String;
 
@@ -18,6 +20,6 @@ pub trait Item {
         None
     }
 
-    fn get_value(&self) -> Result<Value, Self::Error>;
-    fn set_value(&self, Value) -> Result<(), Self::Error>;
+    fn get_value(&self) -> BoxFuture<Value, Self::Error>;
+    fn set_value(&self, Value) -> BoxFuture<(), Self::Error>;
 }

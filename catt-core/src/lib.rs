@@ -20,6 +20,7 @@ extern crate tokio_core;
 pub mod util;
 pub mod bus;
 pub mod value;
+pub mod event;
 pub mod item;
 pub mod binding;
 pub mod bridge;

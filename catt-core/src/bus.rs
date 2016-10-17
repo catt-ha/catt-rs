@@ -1,5 +1,9 @@
+use rustc_serialize::Decodable;
+
 use tokio_core::reactor::Handle;
 use tokio_core::channel::Receiver;
+
+use futures::BoxFuture;
 
 use value::Value;
 use item::Meta;
@@ -20,13 +24,13 @@ pub enum SubType {
 }
 
 pub trait Bus {
-    type Config;
+    type Config: Default + Decodable;
     type Error: ::std::error::Error + Send + 'static;
 
     fn new(&Handle, &Self::Config) -> Result<(Self, Receiver<Message>), Self::Error>
         where Self: ::std::marker::Sized;
 
-    fn publish(&self, Message) -> Result<(), Self::Error>;
-    fn subscribe(&self, item_name: &str, SubType) -> Result<(), Self::Error>;
-    fn unsubscribe(&self, item_name: &str, SubType) -> Result<(), Self::Error>;
+    fn publish(&self, Message) -> BoxFuture<(), Self::Error>;
+    fn subscribe(&self, item_name: &str, SubType) -> BoxFuture<(), Self::Error>;
+    fn unsubscribe(&self, item_name: &str, SubType) -> BoxFuture<(), Self::Error>;
 }

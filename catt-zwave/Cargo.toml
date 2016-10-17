@@ -9,7 +9,7 @@ repository = "https://github.com/catt-ha/catt-rs"
 
 [dependencies]
 serial_ports = { git = "https://github.com/dhylands/serial-ports-rs" }
-openzwave = { git = "https://github.com/fxbox/openzwave-rust" }
+openzwave = "0.1"
 catt-core = { path = "../catt-core", version = "0.1.0" }
 log = "0.3"
 error-chain = "0.5"
