@@ -34,7 +34,7 @@ pub fn zwave(cfg: &str) -> Result<()> {
     let handle = reactor.handle();
     let fut = bridge::from_file::<Mqtt, ZWave>(&handle, &cfg)?;
 
-    let _ = reactor.run(fut);
+    let res = reactor.run(fut);
 
-    Ok(())
+    Ok(res?)
 }

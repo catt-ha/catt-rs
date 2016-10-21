@@ -68,7 +68,6 @@ pub fn from_file<B, C>(handle: &Handle,
     where B: Bus + 'static,
           C: Binding
 {
-
     let cfg: Config<B::Config, C::Config> = Config::from_file(config_file)?;
     Ok(new::<B, C>(handle, cfg)?)
 }
